@@ -1,0 +1,32 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+backend/.uv-cache/
+backend/data/*.db
+backend/data/*.db-*
+backend/htmlcov/
+backend/.coverage
+
+# JavaScript
+node_modules/
+.next/
+coverage/
+frontend/.next/
+frontend/coverage/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# Editors
+.idea/
+.vscode/
+*.swp

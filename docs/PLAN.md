@@ -33,9 +33,15 @@ replayable state.
   choice resolution.
 - Maintain high unit-test coverage for deterministic behavior.
 
-## Later phases
+Status: complete. The engine uses immutable in-memory values, strict effect
+contracts, namespaced seeded random streams, append-only yearly snapshots, and
+an idempotent transaction service. The executable demonstration advances all
+three demo universes from 2026 through 2031 without a narrative provider.
 
-Narrative providers, domain APIs, the full product interface, comparison,
+## Next and later phases
+
+Phase 4 is the mock narrative provider and generated-content schemas.
+Domain APIs, the full product interface, comparison,
 future-self chat, OpenAI integration, and the quality pass follow Phases 4–9.
 Optional enhancements begin only after MVP acceptance criteria pass.
 

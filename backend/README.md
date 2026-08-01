@@ -18,3 +18,15 @@ simulation data.
 
 Application startup never creates tables implicitly. Repositories only flush;
 application services own transactions and commits.
+
+The deterministic engine lives in `app/services/simulation`. Its pure state,
+randomness, validation, balance, event, and transition modules do not depend on
+FastAPI or SQLAlchemy. `SimulationService` is the transaction-owning adapter
+that loads and appends snapshots, persists system events, blocks unresolved
+decisions, and schedules delayed effects.
+
+Run the isolated five-year seeded demonstration from the repository root:
+
+```bash
+make simulation-demo
+```

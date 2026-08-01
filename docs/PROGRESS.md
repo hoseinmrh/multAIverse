@@ -2,9 +2,48 @@
 
 ## Current phase
 
-Phase 2 — Domain and persistence: **complete** (2026-08-01)
+Phase 3 — Deterministic simulation engine: **complete** (2026-08-01)
 
-## Completed work
+## Phase 3 completed work
+
+- Added a pure deterministic engine isolated from FastAPI, SQLAlchemy, and all
+  narrative-provider code.
+- Added namespaced SHA-256 seed derivation and local seeded PRNG streams for
+  event selection, market timing, path outcomes, and probabilistic delayed
+  consequences. The engine never uses global randomness.
+- Added a deeply immutable in-memory simulation state and append-only persisted
+  yearly snapshots.
+- Added strict effect, finance, delayed-effect, and choice-requirement schemas;
+  unknown statistics, extra fields, malformed values, and invalid probabilities
+  are rejected.
+- Added immediate effects, delayed scheduling and application, seeded
+  probability resolution, flags, skills, per-effect caps, diminishing returns,
+  stronger high-stress penalties, aggregate annual caps, and 0–100 clamping.
+- Added yearly baseline recovery, prolonged extreme-stress health damage,
+  nonlinear happiness, burnout risk, career/research/startup momentum, and
+  mode-adjusted success/setback selection with nonzero outcome tails.
+- Added annual income growth, bounded saving behavior, startup runway pressure,
+  positive asset returns, debt interest, and net-worth updates without treating
+  money as a proxy for happiness.
+- Added deterministic routine/significant system events and choices. These are
+  static engine configuration; no narrative provider or LLM is present.
+- Added a transaction-owning simulation service that blocks unresolved choices,
+  validates requirements, applies selections atomically, schedules delayed
+  effects, advances universe cursors, and appends one final snapshot per year.
+- Made choice resolution idempotent: selecting the same choice again returns the
+  existing state without applying any effect twice, while conflicting choices
+  are rejected.
+- Added `make simulation-demo`, which migrates an ephemeral database, seeds the
+  three required universes, auto-selects deterministic choices, advances each
+  five years from 2026 to 2031, prints final results, and uses no LLM.
+- Added unit/integration coverage for seeded replay, immutability, effect
+  validation/application, delayed and probabilistic effects, clamping, stress,
+  happiness, burnout, finances, all momentum families, unresolved blocking,
+  idempotency, and full three-universe five-year reproducibility.
+- Updated the root/backend guides, implementation plan, game design, and
+  architecture documentation for Phase 3.
+
+## Prior completed work
 
 - Added SQLAlchemy 2 typed entities for person profiles, scenarios, universes,
   life-state snapshots, events, choices, delayed effects, artifacts, and
@@ -40,41 +79,35 @@ Phase 2 — Domain and persistence: **complete** (2026-08-01)
 - Updated the root/backend setup guides, architecture, plan, environment sample,
   and quality commands for Phase 2.
 
-## Verification
+## Phase 3 verification
 
 All final checks passed:
 
-- `make setup` — passed with frozen `uv.lock` and `pnpm-lock.yaml`.
-- Clean database `alembic upgrade head` — applied revision `5bd72efdd0ea`.
-- Clean database `scripts/seed_demo.py` — created 1 profile, 1 scenario, 3
-  universes, and 3 initial snapshots.
-- `alembic current` — reported `5bd72efdd0ea (head)`.
-- `alembic check` — reported no new upgrade operations.
-- `make reset-db` — downgraded to base, upgraded to head, and restored the demo.
-- `make seed` — passed and remained idempotent.
-- `make test` — 10 backend tests and 2 frontend tests passed.
-- `make lint` — Ruff and ESLint passed with no findings.
-- `make format-check` — Ruff and Prettier checks passed.
-- `make typecheck` — strict MyPy and TypeScript checks passed.
-- `make build` — backend/app/migration/script byte-compilation and the Next.js
-  16.2.12 production build passed; `/` was statically generated.
+- `cd backend && uv run pytest` — 24 backend tests passed.
+- `cd backend && uv run ruff check app tests migrations ../scripts` — passed.
+- `cd backend && uv run ruff format --check app tests migrations ../scripts` — passed.
+- `cd backend && uv run mypy app tests ../scripts` — strict type checking passed.
+- `cd backend && uv run alembic check` — no schema drift or new upgrade
+  operations detected.
+- `cd backend && uv run python -m compileall -q app migrations ../scripts` — passed.
+- `make simulation-demo` — all three universes reached 2031 with six immutable
+  snapshots each; the command used the ephemeral migrated database and no LLM.
 
-The first sandboxed pnpm setup attempt could not access the package registry,
-and the sandboxed Turbopack build could not bind its private worker port. The
-frozen install and unchanged build both passed with normal local permissions;
-these were verification-environment restrictions rather than code failures.
+Phase 2 migration, seed, complete repository, and immutability verification
+remain covered by the same backend suite. No schema change was needed in Phase
+3, so migration revision `5bd72efdd0ea` remains current.
 
 ## Known limitations
 
-- The deterministic simulation engine has not begun. No time advancement,
-  effect application, seeded event selection, or choice resolution exists yet.
 - Profile/scenario/universe domain APIs remain deferred to Phase 5; the only API
   route is still the health endpoint.
 - The frontend remains the Phase 1 foundation screen and does not expose seeded
   persistence yet.
 - Narrative providers, generated artifacts, and future-self behavior remain
-  deferred to their specified phases. Phase 2 persists their domain records but
-  does not generate content.
+  deferred to their specified phases. Phase 3 system event text is fixed engine
+  configuration and does not implement the Phase 4 narrative abstraction.
+- Yearly summaries are returned as mechanical engine results but are not yet
+  exposed through an API or persisted as narrative content.
 - `make reset-db` intentionally destroys existing local simulation data before
   restoring the demo seed.
 - pnpm continues to report that it blocks the optional `unrs-resolver`
@@ -82,4 +115,4 @@ these were verification-environment restrictions rather than code failures.
 
 ## Next task
 
-Phase 3 — Deterministic simulation engine, only when explicitly requested.
+Phase 4 — Mock narrative system, only when explicitly requested.

@@ -1,9 +1,10 @@
 # Multiverse
 
 Multiverse is a local-first fictional alternate-life simulator. The project is
-currently at **Phase 2: Domain and persistence**: the FastAPI backend, Next.js
-foundation, SQLite domain schema, migrations, and seeded demo data are
-operational. The deterministic simulation engine begins in Phase 3.
+currently at **Phase 3: Deterministic simulation engine**: the FastAPI backend,
+Next.js foundation, SQLite domain schema, seeded demo, and reproducible yearly
+simulation engine are operational. Narrative generation and simulation UI work
+remain in later phases.
 
 > Multiverse creates fictional scenarios for entertainment and reflection. Its
 > simulations are not predictions or professional advice.
@@ -34,6 +35,16 @@ make seed
 
 No API key is needed. `OPENAI_API_KEY` is intentionally unused until the
 OpenAI narrative-provider phase.
+
+To run all three seeded universes through five deterministic years in an
+ephemeral database, without an LLM or narrative provider:
+
+```bash
+make simulation-demo
+```
+
+The command prints the final 2031 statistics and leaves the normal local
+database unchanged.
 
 ## Run locally
 
@@ -68,6 +79,10 @@ make build
 Alembic migrations and idempotently creates the demo profile, scenario, three
 universes, and their initial snapshots. `make reset-db` destructively rebuilds
 the local database and restores that seed.
+
+Backend-only Phase 3 verification can be run from `backend/` with
+`uv run pytest`, `uv run ruff check app tests migrations ../scripts`, and
+`uv run mypy app tests ../scripts`.
 
 Direct migration commands can be run from `backend/`:
 

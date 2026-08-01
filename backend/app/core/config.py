@@ -1,6 +1,11 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = BACKEND_ROOT.parent
+DEFAULT_DATABASE_URL = f"sqlite:///{BACKEND_ROOT / 'data' / 'multiverse.db'}"
 
 
 class Settings(BaseSettings):
@@ -12,9 +17,10 @@ class Settings(BaseSettings):
     backend_host: str = "127.0.0.1"
     backend_port: int = 8000
     backend_cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    database_url: str = DEFAULT_DATABASE_URL
 
     model_config = SettingsConfigDict(
-        env_file=("../.env", ".env"),
+        env_file=(PROJECT_ROOT / ".env", BACKEND_ROOT / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )

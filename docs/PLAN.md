@@ -22,6 +22,10 @@ and frontend tests, lint, format checks, type checks, and builds pass.
 - Use normalized SQLite tables and JSON only for naturally variable data.
 - Preserve immutable snapshots and explicit service-owned transactions.
 
+Status: complete. The seed also persists the three required universe
+definitions and their initial snapshots so Phase 3 can begin from a coherent,
+replayable state.
+
 ## Phase 3 — Deterministic simulation engine
 
 - Add pure state transitions, balance configuration, seeded random streams,

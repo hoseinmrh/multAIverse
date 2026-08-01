@@ -21,29 +21,27 @@ test:
 	pnpm --dir frontend test
 
 lint:
-	cd backend && uv run ruff check app tests
+	cd backend && uv run ruff check app tests migrations ../scripts
 	pnpm --dir frontend lint
 
 format:
-	cd backend && uv run ruff format app tests
+	cd backend && uv run ruff format app tests migrations ../scripts
 	pnpm --dir frontend format
 
 format-check:
-	cd backend && uv run ruff format --check app tests
+	cd backend && uv run ruff format --check app tests migrations ../scripts
 	pnpm --dir frontend format:check
 
 typecheck:
-	cd backend && uv run mypy app tests
+	cd backend && uv run mypy app tests ../scripts
 	pnpm --dir frontend typecheck
 
 build:
-	cd backend && uv run python -m compileall -q app
+	cd backend && uv run python -m compileall -q app migrations ../scripts
 	pnpm --dir frontend build
 
 seed:
-	@echo "Demo database seeding is introduced in Phase 2." >&2
-	@exit 2
+	cd backend && PYTHONPATH=. uv run python ../scripts/seed_demo.py
 
 reset-db:
-	@echo "Database reset is introduced in Phase 2." >&2
-	@exit 2
+	cd backend && PYTHONPATH=. uv run python ../scripts/reset_database.py

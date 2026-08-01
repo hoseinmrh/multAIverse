@@ -1,8 +1,9 @@
 # Multiverse
 
 Multiverse is a local-first fictional alternate-life simulator. The project is
-currently at **Phase 1: Foundation**: the FastAPI backend, Next.js frontend, and
-development toolchain are operational. Domain persistence begins in Phase 2.
+currently at **Phase 2: Domain and persistence**: the FastAPI backend, Next.js
+foundation, SQLite domain schema, migrations, and seeded demo data are
+operational. The deterministic simulation engine begins in Phase 3.
 
 > Multiverse creates fictional scenarios for entertainment and reflection. Its
 > simulations are not predictions or professional advice.
@@ -28,6 +29,7 @@ uv python install 3.12
 ```bash
 cp .env.example .env
 make setup
+make seed
 ```
 
 No API key is needed. `OPENAI_API_KEY` is intentionally unused until the
@@ -62,9 +64,18 @@ make typecheck
 make build
 ```
 
-`make format` applies Ruff and Prettier formatting. `make seed` and
-`make reset-db` are reserved commands that become operational in Phase 2 when
-SQLite persistence is introduced.
+`make format` applies Ruff and Prettier formatting. `make seed` applies pending
+Alembic migrations and idempotently creates the demo profile, scenario, three
+universes, and their initial snapshots. `make reset-db` destructively rebuilds
+the local database and restores that seed.
+
+Direct migration commands can be run from `backend/`:
+
+```bash
+uv run alembic upgrade head
+uv run alembic current
+uv run alembic check
+```
 
 ## Configuration
 
@@ -85,6 +96,9 @@ If the ports change, update both `BACKEND_PORT` and
   application separately with an alternate port and matching environment values.
 - **Dependency state is stale:** remove only the generated `.venv`,
   `node_modules`, and `.next` directories, then run `make setup` again.
+- **The database schema is missing:** run `make seed` to migrate and populate it.
+- **A local database needs a clean rebuild:** run `make reset-db`. This removes
+  existing local simulation data before restoring the demo seed.
 
 See [the architecture overview](docs/ARCHITECTURE.md),
 [implementation plan](docs/PLAN.md), and [progress log](docs/PROGRESS.md).

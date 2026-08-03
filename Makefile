@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 export UV_CACHE_DIR := $(CURDIR)/backend/.uv-cache
 
-.PHONY: setup dev backend-dev frontend-dev test lint format format-check typecheck build seed reset-db simulation-demo
+.PHONY: setup dev backend-dev frontend-dev test lint format format-check typecheck build seed reset-db simulation-demo mock-narrative-demo
 
 setup:
 	cd backend && uv sync --all-groups --frozen
@@ -48,3 +48,6 @@ reset-db:
 
 simulation-demo:
 	cd backend && PYTHONPATH=. uv run python ../scripts/simulate_demo.py
+
+mock-narrative-demo:
+	cd backend && PYTHONPATH=. uv run python ../scripts/mock_narrative_demo.py

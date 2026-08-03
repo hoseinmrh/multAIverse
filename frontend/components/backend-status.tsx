@@ -1,42 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-type ConnectionState = "checking" | "online" | "offline";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "http://127.0.0.1:8000/api/v1";
+import { usePublicConfig } from "@/lib/api/queries";
 
 export function BackendStatus() {
-  const [connectionState, setConnectionState] =
-    useState<ConnectionState>("checking");
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function checkBackend() {
-      try {
-        const response = await fetch(`${API_BASE_URL}/health`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        setConnectionState(response.ok ? "online" : "offline");
-      } catch (error) {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
-          setConnectionState("offline");
-        }
-      }
-    }
-
-    void checkBackend();
-    return () => controller.abort();
-  }, []);
+  const config = usePublicConfig();
+  const connectionState = config.isPending
+    ? "checking"
+    : config.isSuccess
+      ? "online"
+      : "offline";
 
   const label = {
     checking: "Checking local backend…",
-    online: "Backend online",
-    offline: "Backend unavailable",
+    online: `${config.data?.narrative_provider === "mock" ? "Offline narrative" : "Backend"} ready`,
+    offline: "Local backend unavailable",
   }[connectionState];
 
   return (

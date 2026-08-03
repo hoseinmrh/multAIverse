@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -18,6 +19,7 @@ class Settings(BaseSettings):
     backend_port: int = 8000
     backend_cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     database_url: str = DEFAULT_DATABASE_URL
+    narrative_provider: Literal["mock"] = "mock"
 
     model_config = SettingsConfigDict(
         env_file=(PROJECT_ROOT / ".env", BACKEND_ROOT / ".env"),

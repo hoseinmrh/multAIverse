@@ -80,7 +80,7 @@ class ScenarioBase(DomainSchema):
     title: str = Field(min_length=1, max_length=200)
     decision_question: str = Field(min_length=1)
     description: str = ""
-    number_of_universes: int = Field(default=3, gt=0, le=10)
+    number_of_universes: int = Field(default=3, gt=0, le=3)
     simulation_mode: SimulationMode = SimulationMode.REALISTIC
     seed: int
 
@@ -153,6 +153,7 @@ class LifeStateSnapshotRead(LifeStateSnapshotBase):
 class EventBase(DomainSchema):
     universe_id: UUID
     year: int = Field(gt=1900)
+    narrative_key: str | None = Field(default=None, min_length=1, max_length=120)
     title: str = Field(min_length=1, max_length=220)
     description: str = Field(min_length=1)
     category: EventCategory
@@ -235,6 +236,11 @@ class FutureSelfConversationBase(DomainSchema):
     universe_id: UUID
     title: str = Field(min_length=1, max_length=220)
     future_self_age: int = Field(ge=0, le=130)
+    personality_summary: str = Field(
+        default="Reflective, grounded, and consistent with the stored timeline.",
+        min_length=1,
+        max_length=800,
+    )
 
 
 class FutureSelfConversationCreate(FutureSelfConversationBase):

@@ -235,6 +235,7 @@ class Event(Base):
         ForeignKey("universes.id", ondelete="CASCADE"), nullable=False, index=True
     )
     year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    narrative_key: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(220), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     category: Mapped[EventCategory] = mapped_column(
@@ -403,6 +404,11 @@ class FutureSelfConversation(Base):
     )
     title: Mapped[str] = mapped_column(String(220), nullable=False)
     future_self_age: Mapped[int] = mapped_column(Integer, nullable=False)
+    personality_summary: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default="Reflective, grounded, and consistent with the stored timeline.",
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )

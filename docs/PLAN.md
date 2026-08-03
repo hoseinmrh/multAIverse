@@ -38,11 +38,27 @@ contracts, namespaced seeded random streams, append-only yearly snapshots, and
 an idempotent transaction service. The executable demonstration advances all
 three demo universes from 2026 through 2031 without a narrative provider.
 
+## Phase 4 — Mock narrative system
+
+- Add an asynchronous provider protocol and closed generated-content schemas.
+- Build concise narrative contexts without giving providers database access.
+- Add seeded, state-aware, mode-aware, duplicate-resistant mock branches,
+  events, summaries, structured artifacts, and future-self behavior.
+- Demonstrate all three seeded universes for five years with mock narrative as
+  the only provider.
+
+Status: complete. Proposed effects reuse the Phase 3 validation contracts and
+are applied only by the deterministic engine in the demonstration. No OpenAI
+client, frontend feature, database migration, or narrative persistence API was
+added.
+
 ## Next and later phases
 
-Phase 4 is the mock narrative provider and generated-content schemas.
-Domain APIs, the full product interface, comparison,
-future-self chat, OpenAI integration, and the quality pass follow Phases 4–9.
+Phase 5 is complete. It exposes the core domain, simulation, comparison,
+artifact, and future-self flows through transaction-safe `/api/v1` routes with
+integration coverage. Phase 6 is the core product interface; richer comparison
+and future-self screens, OpenAI integration, and the quality pass follow in
+Phases 7–9.
 Optional enhancements begin only after MVP acceptance criteria pass.
 
 ## Key risks

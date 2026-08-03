@@ -2,11 +2,13 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
+from fastapi import FastAPI
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db.base import Base
-from app.db.session import build_engine
+from app.db.session import build_engine, get_session
+from app.main import create_app
 
 
 @pytest.fixture
@@ -31,3 +33,15 @@ def session_factory(db_engine: Engine) -> sessionmaker[Session]:
 def session(session_factory: sessionmaker[Session]) -> Generator[Session, None, None]:
     with session_factory() as database_session:
         yield database_session
+
+
+@pytest.fixture
+def api_app(session_factory: sessionmaker[Session]) -> FastAPI:
+    application = create_app()
+
+    def override_session() -> Generator[Session, None, None]:
+        with session_factory() as database_session:
+            yield database_session
+
+    application.dependency_overrides[get_session] = override_session
+    return application

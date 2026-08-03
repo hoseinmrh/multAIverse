@@ -1,5 +1,5 @@
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
@@ -111,105 +111,121 @@ class SimulationService:
 
     def advance_universe(self, universe_id: UUID) -> AdvancementResult:
         with self.session.begin():
-            universe = self._require_universe(universe_id)
-            pending = self.events.for_universe(universe_id, status=EventStatus.PENDING)
-            if pending or universe.status == UniverseStatus.BLOCKED:
-                raise UniverseBlockedError("Universe has an unresolved important choice")
-            latest = self._require_latest_snapshot(universe)
-            due = self.delayed_effects.due_for_universe(universe.id, latest.year + 1)
-            prepared = self.engine.prepare_year(
-                state_from_snapshot(latest),
-                universe_seed=universe.random_seed,
-                mode=universe.scenario.simulation_mode,
-                due_effects=self._due_inputs(due),
-            )
-            significant = prepared.significant_event
-            if significant.requires_choice:
-                event = self._add_event(universe, significant, EventStatus.PENDING)
-                choice_ids = tuple(
-                    self._add_choice(event, choice).id for choice in significant.choices
-                )
-                universe.status = UniverseStatus.BLOCKED
-                self.session.flush()
-                return AdvancementResult(
-                    universe_id=universe.id,
-                    target_year=prepared.state_before_significant_event.year,
-                    blocked=True,
-                    event_id=event.id,
-                    choice_ids=choice_ids,
-                    state=None,
-                    summary=None,
-                )
+            return self.advance_universe_in_transaction(universe_id)
 
-            result = self.engine.finalize_year(prepared)
-            self._finalize_persistence(universe, prepared, result, due, significant_event=None)
+    def advance_universe_in_transaction(
+        self,
+        universe_id: UUID,
+        significant_event: SystemEventDefinition | None = None,
+    ) -> AdvancementResult:
+        """Advance without opening a transaction for a coordinating application service."""
+        universe = self._require_universe(universe_id)
+        pending = self.events.for_universe(universe_id, status=EventStatus.PENDING)
+        if pending or universe.status == UniverseStatus.BLOCKED:
+            raise UniverseBlockedError("Universe has an unresolved important choice")
+        latest = self._require_latest_snapshot(universe)
+        due = self.delayed_effects.due_for_universe(universe.id, latest.year + 1)
+        prepared = self.engine.prepare_year(
+            state_from_snapshot(latest),
+            universe_seed=universe.random_seed,
+            mode=universe.scenario.simulation_mode,
+            due_effects=self._due_inputs(due),
+        )
+        if significant_event is not None:
+            prepared = replace(prepared, significant_event=significant_event)
+        significant = prepared.significant_event
+        if significant.requires_choice:
+            event = self._add_event(universe, significant, EventStatus.PENDING)
+            choice_ids = tuple(self._add_choice(event, choice).id for choice in significant.choices)
+            universe.status = UniverseStatus.BLOCKED
+            self.session.flush()
             return AdvancementResult(
                 universe_id=universe.id,
-                target_year=result.state.year,
-                blocked=False,
-                event_id=None,
-                choice_ids=(),
-                state=result.state,
-                summary=result.summary,
+                target_year=prepared.state_before_significant_event.year,
+                blocked=True,
+                event_id=event.id,
+                choice_ids=choice_ids,
+                state=None,
+                summary=None,
             )
+
+        result = self.engine.finalize_year(prepared)
+        event = self._finalize_persistence(universe, prepared, result, due, significant_event=None)
+        return AdvancementResult(
+            universe_id=universe.id,
+            target_year=result.state.year,
+            blocked=False,
+            event_id=event.id,
+            choice_ids=(),
+            state=result.state,
+            summary=result.summary,
+        )
 
     def resolve_choice(self, event_id: UUID, choice_id: UUID) -> AdvancementResult:
         with self.session.begin():
-            event = self.events.get(event_id)
-            choice = self.choices.get(choice_id)
-            if event is None or choice is None or choice.event_id != event.id:
-                raise ChoiceResolutionError("Choice does not belong to this event")
-            universe = self._require_universe(event.universe_id)
-            if choice.selected:
-                latest = self._require_latest_snapshot(universe)
-                return AdvancementResult(
-                    universe_id=universe.id,
-                    target_year=latest.year,
-                    blocked=False,
-                    event_id=event.id,
-                    choice_ids=(choice.id,),
-                    state=state_from_snapshot(latest),
-                    summary=None,
-                    idempotent=True,
-                )
-            if event.status == EventStatus.RESOLVED:
-                raise ChoiceResolutionError("Event was already resolved with a different choice")
+            return self.resolve_choice_in_transaction(event_id, choice_id)
 
+    def resolve_choice_in_transaction(
+        self,
+        event_id: UUID,
+        choice_id: UUID,
+        significant_event: SystemEventDefinition | None = None,
+    ) -> AdvancementResult:
+        event = self.events.get(event_id)
+        choice = self.choices.get(choice_id)
+        if event is None or choice is None or choice.event_id != event.id:
+            raise ChoiceResolutionError("Choice does not belong to this event")
+        universe = self._require_universe(event.universe_id)
+        if choice.selected:
             latest = self._require_latest_snapshot(universe)
-            if event.year != latest.year + 1:
-                raise ChoiceResolutionError("Choice event is stale for the current universe year")
-            due = self.delayed_effects.due_for_universe(universe.id, event.year)
-            prepared = self.engine.prepare_year(
-                state_from_snapshot(latest),
-                universe_seed=universe.random_seed,
-                mode=universe.scenario.simulation_mode,
-                due_effects=self._due_inputs(due),
-            )
-            if prepared.significant_event.title != event.title:
-                raise ChoiceResolutionError(
-                    "Stored choice does not match the reproducible year plan"
-                )
-
-            requirements = ChoiceRequirements.model_validate(choice.requirements)
-            if not requirements_met(prepared.state_before_significant_event, requirements):
-                raise ChoiceRequirementsNotMetError("Choice requirements are not met")
-            immediate = EffectPayload.model_validate(choice.immediate_effects)
-            result = self.engine.finalize_year(prepared, immediate)
-
-            choice.selected = True
-            choice.selected_at = datetime.now(UTC)
-            event.status = EventStatus.RESOLVED
-            self._schedule_delayed_effects(universe, choice, event.year)
-            self._finalize_persistence(universe, prepared, result, due, significant_event=event)
             return AdvancementResult(
                 universe_id=universe.id,
-                target_year=result.state.year,
+                target_year=latest.year,
                 blocked=False,
                 event_id=event.id,
                 choice_ids=(choice.id,),
-                state=result.state,
-                summary=result.summary,
+                state=state_from_snapshot(latest),
+                summary=None,
+                idempotent=True,
             )
+        if event.status == EventStatus.RESOLVED:
+            raise ChoiceResolutionError("Event was already resolved with a different choice")
+
+        latest = self._require_latest_snapshot(universe)
+        if event.year != latest.year + 1:
+            raise ChoiceResolutionError("Choice event is stale for the current universe year")
+        due = self.delayed_effects.due_for_universe(universe.id, event.year)
+        prepared = self.engine.prepare_year(
+            state_from_snapshot(latest),
+            universe_seed=universe.random_seed,
+            mode=universe.scenario.simulation_mode,
+            due_effects=self._due_inputs(due),
+        )
+        if significant_event is not None:
+            prepared = replace(prepared, significant_event=significant_event)
+        if prepared.significant_event.title != event.title:
+            raise ChoiceResolutionError("Stored choice does not match the reproducible year plan")
+
+        requirements = ChoiceRequirements.model_validate(choice.requirements)
+        if not requirements_met(prepared.state_before_significant_event, requirements):
+            raise ChoiceRequirementsNotMetError("Choice requirements are not met")
+        immediate = EffectPayload.model_validate(choice.immediate_effects)
+        result = self.engine.finalize_year(prepared, immediate)
+
+        choice.selected = True
+        choice.selected_at = datetime.now(UTC)
+        event.status = EventStatus.RESOLVED
+        self._schedule_delayed_effects(universe, choice, event.year)
+        self._finalize_persistence(universe, prepared, result, due, significant_event=event)
+        return AdvancementResult(
+            universe_id=universe.id,
+            target_year=result.state.year,
+            blocked=False,
+            event_id=event.id,
+            choice_ids=(choice.id,),
+            state=result.state,
+            summary=result.summary,
+        )
 
     def _require_universe(self, universe_id: UUID) -> Universe:
         universe = self.universes.get(universe_id)
@@ -254,6 +270,7 @@ class SimulationService:
             Event(
                 universe_id=universe.id,
                 year=universe.current_year + 1,
+                narrative_key=definition.key,
                 title=definition.title,
                 description=definition.description,
                 category=definition.category,
@@ -318,10 +335,12 @@ class SimulationService:
         due: list[DelayedEffect],
         *,
         significant_event: Event | None,
-    ) -> None:
+    ) -> Event:
         self._add_event(universe, prepared.routine_event, EventStatus.RESOLVED)
         if significant_event is None:
-            self._add_event(universe, prepared.significant_event, EventStatus.RESOLVED)
+            significant_event = self._add_event(
+                universe, prepared.significant_event, EventStatus.RESOLVED
+            )
         for delayed in due:
             delayed.applied = True
         state = result.state
@@ -353,3 +372,4 @@ class SimulationService:
         universe.current_age = state.age
         universe.status = UniverseStatus.ACTIVE
         self.session.flush()
+        return significant_event

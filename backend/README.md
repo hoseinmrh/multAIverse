@@ -25,6 +25,11 @@ FastAPI or SQLAlchemy. `SimulationService` is the transaction-owning adapter
 that loads and appends snapshots, persists system events, blocks unresolved
 decisions, and schedules delayed effects.
 
+Phase 5 routes live under `app/api/v1/routes`. `CoreApplicationService` composes
+repositories, the deterministic simulation service, and the mock narrative
+provider while owning each API transaction. OpenAPI is available at `/docs`
+when the backend is running.
+
 Run the isolated five-year seeded demonstration from the repository root:
 
 ```bash

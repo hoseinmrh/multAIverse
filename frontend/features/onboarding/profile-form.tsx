@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import { useCreateProfile } from "@/lib/api/queries";
 import { profileCreateSchema, type ProfileCreate } from "@/lib/api/schemas";
@@ -47,13 +47,6 @@ const initialProfile: ProfileCreate = {
   constraints: [],
   starting_stats: defaultStats,
 };
-
-const listValue = (values: string[]) => values.join(", ");
-const parseList = (value: string) =>
-  value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
 
 export function ProfileForm() {
   const router = useRouter();
@@ -248,14 +241,16 @@ export function ProfileForm() {
                 <ListField
                   autoFocus
                   label="Goals"
-                  hint="Separate items with commas"
-                  value={listValue(profile.goals)}
-                  onChange={(value) => setField("goals", parseList(value))}
+                  itemName="goal"
+                  hint="Add one goal at a time. Phrases can include spaces."
+                  values={profile.goals}
+                  onChange={(values) => setField("goals", values)}
                 />
                 <ListField
                   label="Interests"
-                  value={listValue(profile.interests)}
-                  onChange={(value) => setField("interests", parseList(value))}
+                  itemName="interest"
+                  values={profile.interests}
+                  onChange={(values) => setField("interests", values)}
                 />
               </div>
             ) : null}
@@ -264,14 +259,16 @@ export function ProfileForm() {
                 <ListField
                   autoFocus
                   label="Strengths"
+                  itemName="strength"
                   hint="What gives you an edge?"
-                  value={listValue(profile.strengths)}
-                  onChange={(value) => setField("strengths", parseList(value))}
+                  values={profile.strengths}
+                  onChange={(values) => setField("strengths", values)}
                 />
                 <ListField
                   label="Growth edges"
-                  value={listValue(profile.weaknesses)}
-                  onChange={(value) => setField("weaknesses", parseList(value))}
+                  itemName="growth edge"
+                  values={profile.weaknesses}
+                  onChange={(values) => setField("weaknesses", values)}
                 />
               </div>
             ) : null}
@@ -280,11 +277,10 @@ export function ProfileForm() {
                 <ListField
                   autoFocus
                   label="Constraints"
+                  itemName="constraint"
                   hint="Time, money, commitments, geography, energy…"
-                  value={listValue(profile.constraints)}
-                  onChange={(value) =>
-                    setField("constraints", parseList(value))
-                  }
+                  values={profile.constraints}
+                  onChange={(values) => setField("constraints", values)}
                 />
                 <p className="form-note">
                   Constraints make the simulation more interesting. They are
@@ -380,7 +376,7 @@ export function ProfileForm() {
             <button
               className="button button-primary"
               type="submit"
-              disabled={createProfile.isPending || currentErrors.length > 0}
+              disabled={createProfile.isPending}
             >
               {createProfile.isPending
                 ? "Saving profile…"
@@ -395,28 +391,82 @@ export function ProfileForm() {
 
 function ListField({
   label,
+  itemName,
   hint,
-  value,
+  values,
   onChange,
   autoFocus = false,
 }: {
   label: string;
+  itemName: string;
   hint?: string;
-  value: string;
-  onChange: (value: string) => void;
+  values: string[];
+  onChange: (values: string[]) => void;
   autoFocus?: boolean;
 }) {
+  const [draft, setDraft] = useState("");
+
+  const addItem = () => {
+    const item = draft.trim().replace(/\s+/g, " ");
+    if (!item) return;
+
+    const alreadyAdded = values.some(
+      (value) => value.toLocaleLowerCase() === item.toLocaleLowerCase(),
+    );
+    if (!alreadyAdded) onChange([...values, item]);
+    setDraft("");
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    addItem();
+  };
+
   return (
-    <label className="field field-wide">
-      <span>
+    <fieldset className="field field-wide list-field">
+      <legend>
         {label} {hint ? <small>{hint}</small> : null}
+      </legend>
+      <div className="list-field-entry">
+        <input
+          aria-label={`New ${itemName}`}
+          autoFocus={autoFocus}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={`Add a ${itemName}`}
+        />
+        <button
+          className="button button-secondary"
+          type="button"
+          disabled={!draft.trim()}
+          onClick={addItem}
+        >
+          Add
+        </button>
+      </div>
+      {values.length ? (
+        <ul className="list-field-items" aria-label={`Added ${label}`}>
+          {values.map((value) => (
+            <li key={value}>
+              <span>{value}</span>
+              <button
+                type="button"
+                aria-label={`Remove ${value}`}
+                onClick={() =>
+                  onChange(values.filter((candidate) => candidate !== value))
+                }
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <span className="sr-only" aria-live="polite">
+        {values.length} {values.length === 1 ? itemName : `${itemName}s`} added
       </span>
-      <textarea
-        autoFocus={autoFocus}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={`${label} separated by commas`}
-      />
-    </label>
+    </fieldset>
   );
 }

@@ -41,9 +41,10 @@ Important codes are `validation_error` (422), `not_found` (404), `conflict`
 ## System
 
 - `GET /health` checks backend availability without touching persistence.
-- `GET /config/public` returns the application name/version, active provider,
-  supported modes, branch limit, and fictional-simulation disclaimer. It never
-  returns credentials or backend-only configuration.
+- `GET /config/public` returns the application name/version, requested provider,
+  safe provider status (active provider, state, model, fallback flag, and
+  detail), supported modes, branch limit, and fictional-simulation disclaimer.
+  It never returns credentials or backend-only configuration.
 
 Health response:
 
@@ -106,9 +107,19 @@ Scenario create example:
 
 Generation calls the configured narrative provider, validates all three branch
 schemas, derives stable universe seeds, and persists each universe plus its
-initial immutable snapshot in one transaction. Repeating the call returns the
-complete existing set with `generated: false`; a partial existing set is a 409
-conflict rather than being silently repaired.
+initial immutable snapshot in one transaction. Repeating the call normally
+returns the complete existing set with `generated: false`; a partial existing
+set is a 409 conflict rather than being silently repaired. One compatibility
+exception repairs pristine scenarios created by the earlier frontend bug that
+stored custom branch directions but generated the three demo branches. The
+repair replaces only an untouched initial set and rolls back completely if
+narrative generation fails.
+
+In strict OpenAI mode (`OPENAI_FALLBACK_TO_MOCK=false`), an untouched universe
+set previously created by the mock provider is replaced transactionally through
+OpenAI the next time this endpoint prepares the story. Provider provenance is
+stored in each universe's `visual_theme.narrative_provider` metadata. Played
+history is never deleted or rewritten.
 
 Comparison returns each universe's current normalized statistics, finances,
 location, career summary, achievements, regrets, decisions, happiness/stress/
@@ -125,7 +136,7 @@ not declare a single best universe or return one aggregate score.
 - `GET /universes/{universe_id}/events?offset=0&limit=20`
 - `GET /universes/{universe_id}/artifacts?offset=0&limit=20`
 
-Advancement asks the mock provider for a schema-validated significant event,
+Advancement asks the configured provider for a schema-validated significant event,
 then passes every proposed effect through the deterministic engine. A required
 choice produces `blocked: true`, persists the event and choices, and does not
 append the target year's snapshot. Further advancement returns 409 until that
@@ -144,6 +155,11 @@ Selection validates ownership and requirements, deterministically replays the
 pending year, applies immediate effects through the engine, schedules delayed
 effects, generates a summary and one structured artifact, appends the immutable
 snapshot, and unblocks the universe in one transaction.
+
+The engine's routine yearly mechanics remain deterministic, but their visible
+timeline title and description are replaced by the configured provider's
+validated yearly narrative before commit. In strict OpenAI mode, provider
+failure rolls back the choice, routine event, artifact, and snapshot together.
 
 Selecting the same choice again is idempotent: the response has
 `idempotent: true` and returns the existing snapshot without reapplying effects

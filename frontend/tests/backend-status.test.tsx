@@ -8,6 +8,13 @@ const config = {
   app_name: "Multiverse API",
   app_version: "0.1.0",
   narrative_provider: "mock",
+  narrative_provider_status: {
+    active_provider: "mock",
+    state: "ready",
+    model: null,
+    fallback_enabled: false,
+    detail: "Offline deterministic narrative generation is ready.",
+  },
   simulation_modes: ["realistic", "cinematic", "utopian", "dark", "chaos"],
   max_universe_branches: 3,
   fictional_simulation_disclaimer: "Fictional only.",

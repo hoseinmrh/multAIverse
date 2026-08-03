@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 const jsonRecordSchema = z.record(z.string(), z.unknown());
+// Universes created before browser-safe seed generation may contain signed
+// 64-bit integers. JSON.parse rounds those values, but the seed is opaque in
+// the frontend, so only integer shape—not safe-integer precision—is required.
+const legacySeedSchema = z
+  .number()
+  .refine(Number.isInteger, "Expected an integer seed.");
 
 export const simulationModeSchema = z.enum([
   "realistic",
@@ -20,7 +26,14 @@ export const paginationSchema = z.object({
 export const publicConfigSchema = z.object({
   app_name: z.string(),
   app_version: z.string(),
-  narrative_provider: z.literal("mock"),
+  narrative_provider: z.enum(["mock", "openai"]),
+  narrative_provider_status: z.object({
+    active_provider: z.enum(["mock", "openai"]).nullable(),
+    state: z.enum(["ready", "configured", "fallback", "unavailable"]),
+    model: z.string().nullable(),
+    fallback_enabled: z.boolean(),
+    detail: z.string(),
+  }),
   simulation_modes: z.array(simulationModeSchema),
   max_universe_branches: z.number().int().positive(),
   fictional_simulation_disclaimer: z.string(),
@@ -100,7 +113,7 @@ export const universeSchema = z.object({
   starting_direction: z.string(),
   current_year: z.number().int(),
   current_age: z.number().int(),
-  random_seed: z.number().int(),
+  random_seed: legacySeedSchema,
   status: z.enum(["active", "blocked", "completed", "archived"]),
   created_at: z.string(),
   updated_at: z.string(),

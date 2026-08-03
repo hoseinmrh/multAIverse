@@ -681,6 +681,65 @@ fieldset > legend,
   border-color: rgba(135, 161, 255, 0.65);
   box-shadow: 0 0 0 3px rgba(117, 151, 255, 0.09);
 }
+.list-field {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.list-field legend {
+  margin-bottom: 0.55rem;
+  padding: 0;
+}
+.list-field-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.65rem;
+}
+.list-field-entry .button {
+  min-width: 72px;
+}
+.list-field-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.list-field-items li {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.42rem 0.5rem 0.42rem 0.7rem;
+  border: 1px solid rgba(137, 163, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(107, 137, 246, 0.1);
+  color: #dbe3ff;
+  font-size: 0.76rem;
+}
+.list-field-items li span {
+  overflow-wrap: anywhere;
+}
+.list-field-items button {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+.list-field-items button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}
 .computed-field {
   display: flex;
   align-items: center;
@@ -1989,6 +2048,110 @@ fieldset > legend,
   resize: none;
 }
 
+/* Saved stories */
+.story-library-heading {
+  display: flex;
+  max-width: none;
+  align-items: end;
+  justify-content: space-between;
+  gap: 2rem;
+}
+.story-library-heading > div {
+  max-width: 760px;
+}
+.story-library-heading h1 {
+  margin-bottom: 1rem;
+}
+.story-library-heading .button {
+  flex: 0 0 auto;
+}
+.story-profile-list {
+  display: grid;
+  gap: 1rem;
+}
+.story-profile-card {
+  overflow: hidden;
+}
+.story-profile-card > header {
+  display: grid;
+  align-items: center;
+  padding: 1.25rem;
+  grid-template-columns: auto 1fr auto;
+  gap: 1rem;
+}
+.story-profile-avatar {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid rgba(135, 161, 255, 0.35);
+  border-radius: 14px;
+  background: var(--accent-soft);
+  color: #b8c7ff;
+  font-size: 1.15rem;
+  font-weight: 760;
+}
+.story-profile-card h2,
+.story-profile-card h3,
+.story-profile-card p {
+  margin: 0;
+}
+.story-profile-card h2 {
+  margin-bottom: 0.2rem;
+  font-size: 1.2rem;
+}
+.story-profile-card header p {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.story-profile-card header small {
+  color: var(--dim);
+  font-size: 0.62rem;
+}
+.story-scenario-list {
+  border-top: 1px solid var(--border);
+}
+.story-scenario-row {
+  display: grid;
+  align-items: center;
+  padding: 1.1rem 1.25rem;
+  grid-template-columns: 1fr auto;
+  gap: 1.5rem;
+}
+.story-scenario-row + .story-scenario-row {
+  border-top: 1px solid var(--border);
+}
+.story-scenario-row span {
+  color: #9fb2ef;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.story-scenario-row h3 {
+  margin: 0.25rem 0 0.35rem;
+  font-size: 1rem;
+}
+.story-scenario-row p,
+.story-profile-empty p {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+.story-open-action {
+  display: grid;
+  justify-items: stretch;
+  gap: 0.45rem;
+}
+.story-open-action .form-error {
+  max-width: 280px;
+  margin: 0;
+}
+.story-profile-empty {
+  padding: 1.1rem 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
 /* Settings */
 .settings-grid {
   display: grid;
@@ -2047,9 +2210,22 @@ fieldset > legend,
   font-size: 0.64rem;
   line-height: 1.45;
 }
+.provider-status small {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--dim);
+  font-size: 0.58rem;
+}
 .status-ready {
   border-color: rgba(112, 221, 178, 0.22);
   color: #9ce7ca;
+}
+.status-error {
+  border-color: rgba(255, 126, 145, 0.28);
+  color: #ff9bad;
+}
+.status-error i {
+  background: var(--danger);
 }
 .settings-note {
   margin-top: 0.8rem;
@@ -2188,6 +2364,19 @@ fieldset > legend,
   }
   .scenario-layout .page-heading {
     position: static;
+  }
+  .story-library-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+  .story-profile-card > header,
+  .story-scenario-row {
+    align-items: start;
+    grid-template-columns: auto 1fr;
+  }
+  .story-profile-card > header .button,
+  .story-open-action {
+    grid-column: 1 / -1;
   }
   .map-header {
     align-items: start;

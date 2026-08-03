@@ -258,6 +258,165 @@ EVENT_TEMPLATES = (
     ),
 )
 
+CUSTOM_EVENT_TEMPLATES = {
+    "education": (
+        _EventTemplate(
+            "custom-education-thesis-opening",
+            ALL_PATHS,
+            "A project could reshape the degree",
+            "A lecturer offers {name} a demanding project connected to the {direction} path, "
+            "with stronger experience but far less unclaimed time.",
+            EventCategory.RESEARCH,
+            base_weight=1.7,
+        ),
+        _EventTemplate(
+            "custom-education-funding-deadline",
+            ALL_PATHS,
+            "A funding deadline moves everything forward",
+            "A time-limited grant could make continued study easier, but its application and "
+            "conditions compete with the work already due.",
+            EventCategory.FINANCE,
+        ),
+        _EventTemplate(
+            "custom-education-internship",
+            ALL_PATHS,
+            "An internship competes with the semester",
+            "A relevant organization offers {name} practical experience during the most "
+            "demanding part of the academic year.",
+            EventCategory.CAREER,
+            base_weight=1.5,
+        ),
+        _EventTemplate(
+            "custom-education-collaboration",
+            ALL_PATHS,
+            "A collaboration raises a question of credit",
+            "Promising shared work develops unevenly, forcing an explicit conversation about "
+            "responsibility, recognition, and deadlines.",
+            EventCategory.RELATIONSHIP,
+        ),
+        _EventTemplate(
+            "custom-education-workload",
+            ALL_PATHS,
+            "The workload stops fitting inside the week",
+            "Study, paid work, and recovery can no longer all receive the time they were "
+            "promised, making a deliberate reduction unavoidable.",
+            EventCategory.HEALTH,
+        ),
+        _EventTemplate(
+            "custom-education-result",
+            ALL_PATHS,
+            "An early result opens an unexpected door",
+            "A strong piece of work brings an invitation that could deepen the {direction} path "
+            "while narrowing other options.",
+            EventCategory.OPPORTUNITY,
+        ),
+    ),
+    "career": (
+        _EventTemplate(
+            "custom-career-visible-assignment",
+            ALL_PATHS,
+            "A visible assignment changes the role",
+            "Leadership asks {name} to own a consequential assignment as {occupation}, offering "
+            "recognition alongside a much less forgiving schedule.",
+            EventCategory.CAREER,
+            base_weight=1.7,
+        ),
+        _EventTemplate(
+            "custom-career-difficult-conclusion",
+            ALL_PATHS,
+            "The analysis reaches an unwelcome conclusion",
+            "Careful work points away from the result senior stakeholders expected, testing "
+            "whether {name} protects accuracy or organizational comfort.",
+            EventCategory.CRISIS,
+            base_weight=1.4,
+        ),
+        _EventTemplate(
+            "custom-career-promotion",
+            ALL_PATHS,
+            "A promotion arrives with hidden scope",
+            "The next title offers more influence and income, but the informal expectations are "
+            "larger than the written role.",
+            EventCategory.CAREER,
+        ),
+        _EventTemplate(
+            "custom-career-compensation",
+            ALL_PATHS,
+            "A competing offer changes the financial picture",
+            "Another organization proposes better compensation for work close to the {direction} "
+            "path, with less certainty about culture and stability.",
+            EventCategory.FINANCE,
+        ),
+        _EventTemplate(
+            "custom-career-colleague",
+            ALL_PATHS,
+            "A colleague asks for shared ownership",
+            "A trusted colleague proposes combining networks and expertise on a visible project, "
+            "raising questions about time, credit, and accountability.",
+            EventCategory.RELATIONSHIP,
+        ),
+        _EventTemplate(
+            "custom-career-training",
+            ALL_PATHS,
+            "A selective training place opens",
+            "A respected program could accelerate {name}'s professional range, but it requires "
+            "a sustained commitment outside normal working hours.",
+            EventCategory.OPPORTUNITY,
+        ),
+    ),
+    "creator": (
+        _EventTemplate(
+            "custom-creator-audience-breakthrough",
+            ALL_PATHS,
+            "One piece reaches an unexpected audience",
+            "A carefully made piece of content travels far beyond {name}'s existing audience, "
+            "creating momentum and pressure to respond quickly.",
+            EventCategory.OPPORTUNITY,
+            base_weight=1.8,
+        ),
+        _EventTemplate(
+            "custom-creator-brand-offer",
+            ALL_PATHS,
+            "A brand offer comes with conditions",
+            "A fictional company offers meaningful payment for a partnership that would shape "
+            "what {name} publishes and how the audience perceives the work.",
+            EventCategory.FINANCE,
+            base_weight=1.4,
+        ),
+        _EventTemplate(
+            "custom-creator-consistency",
+            ALL_PATHS,
+            "Consistency begins to consume the private week",
+            "The publishing rhythm that grows the audience leaves too little space for health, "
+            "relationships, and work that is not immediately visible.",
+            EventCategory.HEALTH,
+        ),
+        _EventTemplate(
+            "custom-creator-collaboration",
+            ALL_PATHS,
+            "A creator proposes a shared series",
+            "A fictional creator with a different audience suggests a collaboration, bringing "
+            "reach as well as uncertainty about voice and ownership.",
+            EventCategory.RELATIONSHIP,
+        ),
+        _EventTemplate(
+            "custom-creator-platform-change",
+            ALL_PATHS,
+            "A platform change cuts discoverability",
+            "A sudden distribution change reduces reach and forces a choice between chasing the "
+            "platform, building direct audience access, or slowing down.",
+            EventCategory.CRISIS,
+        ),
+        _EventTemplate(
+            "custom-creator-niche",
+            ALL_PATHS,
+            "The audience pulls in two directions",
+            "The fastest-growing topics differ from the work {name} most wants to make, turning "
+            "the {direction} path into a question of identity as well as growth.",
+            EventCategory.CAREER,
+        ),
+    ),
+}
+
 MODE_OPENERS = {
     SimulationMode.REALISTIC: "Within the year's ordinary constraints",
     SimulationMode.CINEMATIC: "At a decisive and unusually public moment",
@@ -269,6 +428,10 @@ MODE_OPENERS = {
 
 class MockNarrativeProvider:
     """Offline, deterministic narrative templates with no persistence capabilities."""
+
+    provider_name = "mock"
+    last_used_provider = "mock"
+    llm_only = False
 
     async def generate_universe_branches(
         self, request: UniverseBranchRequest
@@ -283,10 +446,12 @@ class MockNarrativeProvider:
 
     async def generate_significant_event(self, context: NarrativeContext) -> GeneratedEvent:
         path = self._path(context)
+        custom_path = self._custom_path(context)
+        catalogue = CUSTOM_EVENT_TEMPLATES.get(custom_path, EVENT_TEMPLATES)
         used = set(context.previous_event_keys)
         candidates = [
             template
-            for template in EVENT_TEMPLATES
+            for template in catalogue
             if path in template.paths
             and (template.modes is None or context.simulation_mode in template.modes)
             and template.key not in used
@@ -310,12 +475,17 @@ class MockNarrativeProvider:
         rendered_description = template.description.format(
             name=context.profile.name,
             location=context.current_state.location,
+            occupation=context.current_state.career_title,
+            direction=context.universe.starting_direction,
         )
         description = f"{MODE_OPENERS[context.simulation_mode]}, {rendered_description}"
         return GeneratedEvent(
             event_key=template.key,
             year=context.current_year + 1,
-            title=template.title,
+            title=template.title.format(
+                occupation=context.current_state.career_title,
+                direction=context.universe.starting_direction,
+            ),
             description=description,
             category=template.category,
             importance=template.importance,
@@ -465,11 +635,20 @@ class MockNarrativeProvider:
     @staticmethod
     def _branch_kind(direction: str, index: int) -> str:
         lowered = direction.casefold()
-        if any(word in lowered for word in ("robot", "phd", "research")):
+        if any(
+            word in lowered
+            for word in ("robot", "phd", "research", "study", "university", "master")
+        ):
             return "research"
-        if any(word in lowered for word in ("startup", "found", "company")):
+        if any(
+            word in lowered
+            for word in ("startup", "found", "company", "creator", "content", "independent")
+        ):
             return "startup"
-        if any(word in lowered for word in ("industry", "applied", "leader")):
+        if any(
+            word in lowered
+            for word in ("industry", "applied", "leader", "career", "analyst", "job")
+        ):
             return "industry"
         return ("industry", "research", "startup")[index % 3]
 
@@ -516,10 +695,18 @@ class MockNarrativeProvider:
             ),
         }
         name, subtitle, motif, accent, career, income, worth, skills, flags = definitions[kind]
-        if direction not in ("Applied AI Leader", "Robotics Researcher", "Startup Founder"):
+        is_default_direction = direction in (
+            "Applied AI Leader",
+            "Robotics Researcher",
+            "Startup Founder",
+        )
+        if not is_default_direction:
             name = direction
+            subtitle, career, skills, flags = self._custom_branch_details(request, direction, kind)
         slug = "-".join(part for part in name.lower().replace("/", " ").split() if part)
         slug = "".join(character for character in slug if character.isalnum() or character == "-")
+        if not is_default_direction:
+            slug = f"{slug[:96].rstrip('-')}-{index + 1}"
         mode_clause = {
             SimulationMode.REALISTIC: "through plausible progress and setbacks",
             SimulationMode.CINEMATIC: "through visible turning points and dramatic reversals",
@@ -563,6 +750,44 @@ class MockNarrativeProvider:
         )
 
     @staticmethod
+    def _custom_branch_details(
+        request: UniverseBranchRequest, direction: str, kind: str
+    ) -> tuple[str, str, dict[str, int], list[str]]:
+        lowered = direction.casefold()
+        if kind == "research":
+            return (
+                "A focused path through advanced study, evidence, and new expertise",
+                "Graduate Student"
+                if any(word in lowered for word in ("study", "university", "master"))
+                else "Researcher",
+                {"research": 70, "analysis": 73, "academic_writing": 64},
+                ["phd_path", "education_path"],
+            )
+        if kind == "startup" and any(word in lowered for word in ("creator", "content")):
+            return (
+                "An independent path built through creative work and audience growth",
+                "Content Creator",
+                {"content_creation": 68, "communication": 70, "entrepreneurship": 45},
+                ["startup_path", "independent_path", "creator_path"],
+            )
+        if kind == "startup":
+            return (
+                "An independent path balancing ownership, uncertainty, and growth",
+                "Founder",
+                {"entrepreneurship": 62, "product": 58, "communication": 61},
+                ["startup_path", "independent_path"],
+            )
+        career = request.profile.occupation
+        if " as a " in lowered:
+            career = direction[lowered.index(" as a ") + len(" as a ") :].strip()
+        return (
+            "A professional path building experience, stability, and wider responsibility",
+            career,
+            {"professional_expertise": 72, "communication": 62, "leadership": 38},
+            ["industry_path", "career_path"],
+        )
+
+    @staticmethod
     def _path(context: NarrativeContext) -> str:
         flags = set(context.current_state.active_flags)
         if "phd_path" in flags:
@@ -570,6 +795,17 @@ class MockNarrativeProvider:
         if "startup_path" in flags:
             return "startup"
         return "industry"
+
+    @staticmethod
+    def _custom_path(context: NarrativeContext) -> str:
+        flags = set(context.current_state.active_flags)
+        if "creator_path" in flags:
+            return "creator"
+        if "education_path" in flags:
+            return "education"
+        if "career_path" in flags:
+            return "career"
+        return ""
 
     @staticmethod
     def _event_weight(template: _EventTemplate, context: NarrativeContext) -> float:

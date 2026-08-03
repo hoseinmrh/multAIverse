@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 
 import { BackendStatus } from "@/components/backend-status";
-import { DEMO_SCENARIO_ID, DISCLAIMER } from "@/lib/constants";
+import { DISCLAIMER } from "@/lib/constants";
 
 const branches = [
   { label: "Applied AI", className: "landing-branch branch-blue" },
@@ -56,11 +56,8 @@ export default function Home() {
               Enter the Multiverse
               <span aria-hidden="true">→</span>
             </Link>
-            <Link
-              className="button button-secondary"
-              href={`/multiverse/${DEMO_SCENARIO_ID}`}
-            >
-              Explore Hosein&apos;s demo
+            <Link className="button button-secondary" href="/stories">
+              View saved stories
             </Link>
           </div>
           <BackendStatus />

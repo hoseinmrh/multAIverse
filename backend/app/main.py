@@ -17,6 +17,7 @@ from app.services.application import (
     ResourceConflictError,
     ResourceNotFoundError,
 )
+from app.services.narrative import NarrativeProviderConfigurationError
 
 
 def _error_response(
@@ -74,6 +75,16 @@ def create_app() -> FastAPI:
             "validation_error",
             "Request validation failed",
             {"issues": issues},
+        )
+
+    @application.exception_handler(NarrativeProviderConfigurationError)
+    async def provider_configuration_error_handler(
+        _: Request, __: NarrativeProviderConfigurationError
+    ) -> JSONResponse:
+        return _error_response(
+            503,
+            "narrative_unavailable",
+            "The configured narrative provider is unavailable; existing progress was preserved",
         )
 
     @application.exception_handler(ValidationError)

@@ -14,6 +14,7 @@ from app.services.simulation.schemas import (
     ChoiceRequirements,
     DelayedEffectSpec,
     EffectPayload,
+    ScoreMap,
 )
 
 
@@ -169,7 +170,7 @@ class ProposedInitialState(NarrativeSchema):
     discipline: Score
     creativity: Score
     chaos: Score
-    skills: dict[str, Score]
+    skills: ScoreMap
     active_flags: list[ShortText]
 
 
@@ -187,6 +188,10 @@ class GeneratedUniverseBranch(NarrativeSchema):
     starting_direction: Annotated[str, Field(min_length=1, max_length=800)]
     proposed_initial_state: ProposedInitialState
     narrative_tags: list[ShortText] = Field(min_length=1, max_length=8)
+
+
+class GeneratedUniverseBranches(NarrativeSchema):
+    branches: list[GeneratedUniverseBranch] = Field(min_length=1, max_length=3)
 
 
 class GeneratedChoice(NarrativeSchema):

@@ -72,8 +72,10 @@ from app.services.narrative import (
 )
 from app.services.narrative import (
     FutureSelfReplyRequest,
+    GeneratedChoice,
     GeneratedEvent,
     GeneratedFutureSelfProfile,
+    GeneratedYearSummary,
     MockNarrativeProvider,
     NarrativeContext,
     NarrativeContextBuilder,
@@ -89,7 +91,17 @@ from app.services.simulation import (
     derive_seed,
 )
 from app.services.simulation.events import ChoiceDefinition, SystemEventDefinition
-from app.services.simulation.schemas import EffectPayload
+from app.services.simulation.schemas import ChoiceRequirements, DelayedEffectSpec, EffectPayload
+
+MAX_JSON_SAFE_INTEGER = 2**53 - 1
+DEFAULT_MOCK_BRANCH_DIRECTIONS = {
+    "Applied AI Leader",
+    "Robotics Researcher",
+    "Startup Founder",
+}
+BRANCH_DIRECTIONS_PREFIX = "Optional branch directions:"
+LEGACY_MOCK_EVENT_PREFIXES = ("industry-", "research-", "startup-")
+CUSTOM_PATH_FLAGS = {"career_path", "education_path", "creator_path", "independent_path"}
 
 
 class ApplicationServiceError(RuntimeError):
@@ -227,6 +239,7 @@ class CoreApplicationService:
     async def generate_universes(self, scenario_id: UUID) -> UniverseGenerationResponse:
         with self.session.begin():
             scenario = _required(self.scenarios.get(scenario_id), "Scenario", scenario_id)
+            branch_directions = self._branch_directions(scenario)
             existing = self.universes.for_scenario(scenario_id)
             if existing:
                 if len(existing) != scenario.number_of_universes:
@@ -237,10 +250,18 @@ class CoreApplicationService:
                             "expected": scenario.number_of_universes,
                         },
                     )
-                return UniverseGenerationResponse(
-                    generated=False,
-                    universes=[UniverseRead.model_validate(universe) for universe in existing],
-                )
+                if self._can_replace_non_llm_branches(existing) or self._can_repair_legacy_branches(
+                    existing, branch_directions
+                ):
+                    for universe in existing:
+                        self.universes.delete(universe)
+                    self.session.flush()
+                else:
+                    await self._refresh_pending_non_llm_events(existing)
+                    return UniverseGenerationResponse(
+                        generated=False,
+                        universes=[UniverseRead.model_validate(universe) for universe in existing],
+                    )
 
             profile = _required(
                 self.profiles.get(scenario.profile_id), "Profile", scenario.profile_id
@@ -251,6 +272,7 @@ class CoreApplicationService:
                 scenario_seed=scenario.seed,
                 simulation_mode=scenario.simulation_mode,
                 number_of_branches=scenario.number_of_universes,
+                branch_directions=branch_directions,
             )
             branches = await self._narrative(self.provider.generate_universe_branches(request))
             if len(branches) != scenario.number_of_universes:
@@ -260,7 +282,9 @@ class CoreApplicationService:
 
             created: list[Universe] = []
             for index, branch in enumerate(branches):
-                seed = derive_seed(scenario.seed, branch.slug, index) % (2**63 - 1)
+                # Universe seeds cross the JSON boundary even though only the
+                # backend uses them. Keep new values exact in JavaScript clients.
+                seed = derive_seed(scenario.seed, branch.slug, index) % MAX_JSON_SAFE_INTEGER
                 state = branch.proposed_initial_state
                 universe = self.universes.add(
                     Universe(
@@ -272,6 +296,7 @@ class CoreApplicationService:
                         visual_theme={
                             "accent": branch.accent_color,
                             "motif": branch.visual_theme,
+                            "narrative_provider": self._last_narrative_provider_name(),
                         },
                         starting_direction=branch.starting_direction,
                         current_year=profile.starting_year,
@@ -309,6 +334,104 @@ class CoreApplicationService:
                 generated=True,
                 universes=[UniverseRead.model_validate(universe) for universe in created],
             )
+
+    @staticmethod
+    def _branch_directions(scenario: Scenario) -> list[str]:
+        for line in scenario.description.splitlines():
+            stripped = line.strip()
+            if not stripped.startswith(BRANCH_DIRECTIONS_PREFIX):
+                continue
+            encoded = stripped.removeprefix(BRANCH_DIRECTIONS_PREFIX).strip()
+            if encoded.endswith("."):
+                encoded = encoded[:-1]
+            directions = [item.strip() for item in encoded.split("|") if item.strip()]
+            if len(directions) == scenario.number_of_universes:
+                return directions
+        return []
+
+    def _can_repair_legacy_branches(
+        self, existing: list[Universe], branch_directions: list[str]
+    ) -> bool:
+        if not branch_directions:
+            return False
+        current_directions = {universe.starting_direction for universe in existing}
+        if current_directions != DEFAULT_MOCK_BRANCH_DIRECTIONS:
+            return False
+        if current_directions == set(branch_directions):
+            return False
+        return all(
+            len(self.snapshots.for_universe(universe.id)) == 1
+            and not self.events.for_universe(universe.id)
+            and not self.artifacts.for_universe(universe.id)
+            and not self.conversations.for_universe(universe.id)
+            for universe in existing
+        )
+
+    def _can_replace_non_llm_branches(self, universes: list[Universe]) -> bool:
+        if not self.provider.llm_only:
+            return False
+        if all(
+            universe.visual_theme.get("narrative_provider") == "openai" for universe in universes
+        ):
+            return False
+        for universe in universes:
+            if len(self.snapshots.for_universe(universe.id)) != 1:
+                return False
+            events = self.events.for_universe(universe.id)
+            if any(
+                event.status != EventStatus.PENDING
+                or any(choice.selected for choice in self.choices.for_event(event.id))
+                for event in events
+            ):
+                return False
+            if self.artifacts.for_universe(universe.id) or self.conversations.for_universe(
+                universe.id
+            ):
+                return False
+            delayed_count = self.session.scalar(
+                select(func.count())
+                .select_from(DelayedEffect)
+                .where(DelayedEffect.universe_id == universe.id)
+            )
+            if delayed_count:
+                return False
+        return True
+
+    async def _refresh_pending_non_llm_events(self, universes: list[Universe]) -> None:
+        for universe in universes:
+            pending = self.events.for_universe(universe.id, status=EventStatus.PENDING)
+            if len(pending) != 1:
+                continue
+            event = pending[0]
+            if any(choice.selected for choice in self.choices.for_event(event.id)):
+                continue
+            latest = _required(self.snapshots.latest(universe.id), "Universe state", universe.id)
+            is_legacy_custom_event = (
+                event.source == EventSource.MOCK
+                and event.narrative_key is not None
+                and event.narrative_key.startswith(LEGACY_MOCK_EVENT_PREFIXES)
+                and bool(CUSTOM_PATH_FLAGS.intersection(latest.active_flags))
+            )
+            is_non_llm_event_in_strict_mode = (
+                self.provider.llm_only and event.source != EventSource.OPENAI
+            )
+            if not is_legacy_custom_event and not is_non_llm_event_in_strict_mode:
+                continue
+
+            self.events.delete(event)
+            self.session.flush()
+            universe.status = UniverseStatus.ACTIVE
+            previous = self.events.for_universe(universe.id)
+            context = self._context(universe, latest, previous)
+            generated = await self._narrative(self.provider.generate_significant_event(context))
+            result = self.simulation.advance_universe_in_transaction(
+                universe.id, self._event_definition(generated)
+            )
+            if not result.blocked or result.event_id is None:
+                raise InvalidOperationError("Legacy event repair must produce a pending decision")
+            replacement = _required(self.events.get(result.event_id), "Event", result.event_id)
+            replacement.is_generated = True
+            replacement.source = self._provider_event_source()
 
     def get_universe(self, universe_id: UUID) -> UniverseRead:
         universe = _required(self.universes.get(universe_id), "Universe", universe_id)
@@ -360,7 +483,7 @@ class CoreApplicationService:
                     raise InvalidOperationError("Advancement did not persist an event")
                 persisted = _required(self.events.get(result.event_id), "Event", result.event_id)
                 persisted.is_generated = True
-                persisted.source = EventSource.MOCK
+                persisted.source = self._provider_event_source()
                 if result.blocked:
                     return self._advancement_response(result, persisted)
                 return await self._complete_advancement(result, universe, persisted, generated)
@@ -392,17 +515,7 @@ class CoreApplicationService:
                         "Event was already resolved with a different choice"
                     )
 
-                latest = _required(
-                    self.snapshots.latest(universe.id), "Universe state", universe.id
-                )
-                all_events = self.events.for_universe(universe.id)
-                previous = [stored for stored in all_events if stored.id != event.id]
-                context = self._context(universe, latest, previous, unresolved=[event])
-                generated = await self._narrative(self.provider.generate_significant_event(context))
-                if event.narrative_key != generated.event_key:
-                    raise InvalidOperationError(
-                        "Stored event no longer matches its deterministic narrative replay"
-                    )
+                generated = self._stored_generated_event(event)
                 result = self.simulation.resolve_choice_in_transaction(
                     event_id, choice_id, self._event_definition(generated)
                 )
@@ -684,6 +797,7 @@ class CoreApplicationService:
         summary = await self._narrative(
             self.provider.generate_year_summary(completed_context, generated)
         )
+        self._apply_provider_year_narrative(universe, event, summary)
         generated_artifact = await self._narrative(
             self.provider.generate_artifact(completed_context, generated)
         )
@@ -753,6 +867,68 @@ class CoreApplicationService:
                 for choice in generated.choices
             ),
         )
+
+    def _stored_generated_event(self, event: Event) -> GeneratedEvent:
+        if event.narrative_key is None:
+            raise InvalidOperationError("Stored generated event has no narrative key")
+        choices = [
+            GeneratedChoice(
+                label=choice.label,
+                description=choice.description,
+                immediate_effects=EffectPayload.model_validate(choice.immediate_effects),
+                delayed_effects=[
+                    DelayedEffectSpec.model_validate(effect) for effect in choice.delayed_effects
+                ],
+                requirements=ChoiceRequirements.model_validate(choice.requirements),
+                risk_level=choice.risk_level,
+            )
+            for choice in event.choices
+        ]
+        return GeneratedEvent(
+            event_key=event.narrative_key,
+            year=event.year,
+            title=event.title,
+            description=event.description,
+            category=event.category,
+            importance=event.importance,
+            requires_choice=True,
+            choices=choices,
+            artifact_suggestions=[],
+            narrative_tags=[event.source.value, "persisted", "fictional"],
+        )
+
+    def _provider_event_source(self) -> EventSource:
+        return (
+            EventSource.OPENAI
+            if getattr(self.provider, "last_used_provider", "mock") == "openai"
+            else EventSource.MOCK
+        )
+
+    def _last_narrative_provider_name(self) -> str:
+        return getattr(self.provider, "last_used_provider", self.provider.provider_name)
+
+    def _apply_provider_year_narrative(
+        self,
+        universe: Universe,
+        significant_event: Event,
+        summary: GeneratedYearSummary,
+    ) -> None:
+        routine = next(
+            (
+                event
+                for event in self.events.for_universe(universe.id)
+                if event.year == summary.year
+                and event.id != significant_event.id
+                and event.source == EventSource.SYSTEM
+            ),
+            None,
+        )
+        if routine is None:
+            return
+        routine.title = summary.headline
+        routine.description = summary.overview
+        routine.is_generated = True
+        routine.source = self._provider_event_source()
 
     async def _conversation_identity(
         self, conversation: FutureSelfConversation

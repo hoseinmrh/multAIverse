@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { profileCreateSchema, scenarioCreateSchema } from "@/lib/api/schemas";
+import {
+  generationSchema,
+  profileCreateSchema,
+  scenarioCreateSchema,
+  universeSchema,
+} from "@/lib/api/schemas";
+import { universe } from "@/tests/fixtures";
 
 describe("frontend validation", () => {
   it("rejects a profile with inconsistent age and required identity gaps", () => {
@@ -44,5 +50,22 @@ describe("frontend validation", () => {
         decision_question: "Should I pursue research or build a company?",
       }).success,
     ).toBe(true);
+  });
+
+  it("accepts legacy 64-bit universe seeds as opaque response data", () => {
+    const legacyUniverse = {
+      ...universe,
+      random_seed: 7_407_653_921_339_816_134,
+    };
+
+    expect(
+      generationSchema.safeParse({
+        generated: true,
+        universes: [legacyUniverse],
+      }).success,
+    ).toBe(true);
+    expect(
+      universeSchema.safeParse({ ...legacyUniverse, random_seed: 1.5 }).success,
+    ).toBe(false);
   });
 });

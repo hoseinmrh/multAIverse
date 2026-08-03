@@ -13,6 +13,7 @@ import type { ProfileCreate, ScenarioCreate } from "@/lib/api/schemas";
 export const queryKeys = {
   config: ["config"] as const,
   profiles: ["profiles"] as const,
+  scenarios: ["scenarios"] as const,
   scenario: (id: string) => ["scenario", id] as const,
   universe: (id: string) => ["universe", id] as const,
   state: (id: string) => ["universe", id, "state"] as const,
@@ -29,6 +30,13 @@ export function usePublicConfig() {
 
 export function useProfiles() {
   return useQuery({ queryKey: queryKeys.profiles, queryFn: api.profiles });
+}
+
+export function useScenarios() {
+  return useQuery({
+    queryKey: queryKeys.scenarios,
+    queryFn: () => api.scenarios(),
+  });
 }
 
 export function useScenario(id: string) {
@@ -60,12 +68,15 @@ export function useCreateProfile() {
 }
 
 export function useCreateScenario() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: ScenarioCreate) => {
       const scenario = await api.createScenario(input);
       await api.generateUniverses(scenario.id);
       return scenario;
     },
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.scenarios }),
   });
 }
 

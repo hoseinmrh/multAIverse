@@ -70,6 +70,27 @@ def test_generated_effects_reuse_simulation_allowlist() -> None:
         )
 
 
+def test_key_value_wire_entries_validate_into_engine_maps() -> None:
+    effects = EffectPayload.model_validate(
+        {
+            "stats": [{"key": "career_level", "value": 4}],
+            "skill_changes": [{"key": "negotiation", "value": 3}],
+        }
+    )
+
+    assert effects.stats == {"career_level": 4}
+    assert effects.skill_changes == {"negotiation": 3}
+    with pytest.raises(ValidationError):
+        EffectPayload.model_validate(
+            {
+                "stats": [
+                    {"key": "stress", "value": 2},
+                    {"key": "stress", "value": 3},
+                ]
+            }
+        )
+
+
 def test_context_state_and_branch_request_are_bounded() -> None:
     with pytest.raises(ValidationError):
         NarrativeState(

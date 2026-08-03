@@ -14,7 +14,8 @@ FastAPI backend :8000
   ├── application services       (transaction boundaries)
   ├── deterministic engine
   ├── narrative-provider port
-  │     └── offline seeded mock adapter
+  │     ├── offline seeded mock adapter (default)
+  │     └── OpenAI Responses API adapter (optional, backend-only)
   └── repositories → SQLAlchemy → SQLite
 ```
 
@@ -132,9 +133,12 @@ one-snapshot-per-year and append-only guarantees. Re-selecting the same choice
 returns the existing final state; selecting a different choice after resolution
 is rejected.
 
-Mechanical routine events remain engine fixtures. API advancement replaces the
-engine's significant-event fixture with a provider proposal while retaining
-the same deterministic preparation, validation, caps, and finalization.
+Mechanical routine effects remain engine-owned fixtures. API advancement
+replaces the engine's significant-event fixture with a provider proposal while
+retaining deterministic preparation, validation, caps, and finalization. After
+the state is finalized, the provider's validated yearly summary replaces the
+routine event's visible title and description before the transaction commits;
+the deterministic routine prose is therefore not exposed as story content.
 
 ## Phase 4 narrative system
 
@@ -187,6 +191,76 @@ five years in each seeded universe. The engine validates, caps, and applies
 chosen proposals; the harness also creates summaries, artifacts, and a
 future-self exchange.
 
+## Optional OpenAI narrative provider
+
+`OpenAINarrativeProvider` implements the same persistence-free protocol through
+the asynchronous OpenAI Responses API. Every narrative operation has its own
+prompt builder: universe branches, significant events, yearly summaries,
+artifacts, future-self profiles, and future-self replies. The adapter calls
+`responses.parse` with the existing Pydantic output model, disables response
+storage, caps serialized output size, and validates the parsed object again
+before returning it. Output ceilings are task-specific: short future-self
+answers and profiles receive smaller budgets than events and three-branch
+generation. Optional reasoning-effort and verbosity controls let GPT-5 models
+run economically without forcing unsupported parameters onto other models.
+Dynamic engine maps (skills, stat effects, and requirements) use bounded unique
+`{key,value}` entries only on the Structured Outputs wire, because strict JSON
+schemas reject dynamically keyed objects. Pydantic converts them back into the
+existing validated dictionaries before any proposal reaches the engine.
+
+```text
+bounded application values
+  → task-specific prompt builder (20,000-character request ceiling)
+  → Responses API + Pydantic Structured Output (store=false)
+  → semantic checks (year, event key, artifact link, identity grounding)
+  → deterministic engine validation/capping
+  → one application-owned transaction commit
+```
+
+The SDK's automatic retries are disabled. The adapter owns a zero-to-five
+retry budget from `OPENAI_MAX_RETRIES`, applies a short bounded backoff to
+timeouts, connection failures, rate limits, invalid structured output, and
+empty responses, and never retries authentication failures. Logs contain only
+operation name, attempt number, safe error category, HTTP status, and fallback
+state—never exception messages, response bodies, prompts, profile content, or
+credentials. A model-specific `unsupported_parameter` response for optional
+reasoning or verbosity controls consumes at most one configured retry and
+resends the request with those controls omitted. With
+`OPENAI_FALLBACK_TO_MOCK=true`, exhausted or non-retryable provider errors run
+the same operation through `MockNarrativeProvider`.
+
+With `OPENAI_FALLBACK_TO_MOCK=false`, OpenAI mode is narrative-strict: branch
+premises and initial states, yearly significant events and choices, routine
+timeline prose, summaries, artifacts, future-self profiles, and replies all
+come from validated OpenAI outputs. An untouched mock-authored universe set is
+transactionally regenerated and tagged with provider provenance when opened;
+played snapshots and resolved decisions are immutable and are never rewritten.
+
+OpenAI-generated decisions are not regenerated when a user later selects a
+choice. Their strictly validated choices and effects are persisted with the
+pending event, then reconstructed from that stored proposal for deterministic
+resolution. This avoids relying on nondeterministic model replay and ensures
+the engine applies exactly the proposal the user saw. Summary or artifact
+failure after resolution still rolls back the surrounding transaction.
+
+Provider status is derived without probing the external API. Public config
+reports the requested provider, active configured/fallback provider, model,
+fallback flag, and safe readiness detail. It has no credential field. Runtime
+provider errors remain user-safe `503 narrative_unavailable` responses when no
+fallback succeeds.
+
+The data disclosed when OpenAI mode is active is intentionally bounded and
+task-specific: profile name/current age, starting location/occupation,
+education, shortened biography, limited strengths/interests/goals/constraints,
+universe premise/direction/seed, current stored state and flags, three recent
+major events, up to three unresolved decisions, a 1,500-character long-term
+summary, and mode/year. Only significant-event generation receives the 40-key
+duplicate-prevention window and effect allowlist. Summaries and artifacts
+receive a compact event record without proposed choice/effect payloads.
+Future-self replies additionally include the persisted identity/personality,
+current message, and eight recent chat messages. Birth year and profile
+weaknesses are not sent. Mock mode sends nothing externally.
+
 ## Phase 5 core API and application services
 
 All public routes are under `/api/v1`. The route modules are split by profiles,
@@ -199,7 +273,7 @@ FastAPI route
   → request-scoped CoreApplicationService
       → repositories load domain state
       → bounded NarrativeContextBuilder
-      → mock provider returns validated proposal
+      → configured narrative provider returns validated proposal
       → SimulationService + deterministic engine validate/apply
       → repositories flush events/snapshots/artifacts/messages
   → transaction commit
@@ -209,10 +283,24 @@ FastAPI route
 Universe generation validates the complete branch set before creating the
 universes and their initial snapshots in one transaction. Annual advancement
 persists a pending significant event without a snapshot when user input is
-required. Choice resolution deterministically regenerates the event, checks its
-persisted narrative key, applies the selected effects once, schedules delayed
+required. Choice resolution reconstructs the validated event and choices from
+that persisted proposal, applies the selected effects once, schedules delayed
 effects, creates the summary and artifact, and appends the final snapshot in a
 single transaction. A provider or persistence exception rolls back all of it.
+
+The scenario UI records optional branch directions in its bounded description
+payload. Universe generation extracts that structured line and forwards the
+directions to either narrative provider. A compatibility guard recognizes only
+the old three demo directions on a completely pristine non-demo scenario; it
+may rebuild that initial set transactionally. Any event, additional snapshot,
+artifact, or future-self conversation makes the scenario ineligible, so repair
+cannot erase played history.
+
+Custom mock paths use separate education, career, and creator event catalogues
+rather than the seeded AI/robotics/startup catalogue. A second compatibility
+guard may replace an unselected pending mock event whose key came from the old
+catalogue. It never touches a resolved event or snapshot, and the replacement
+is created inside the same transaction.
 
 The selected-choice uniqueness constraint provides a database backstop for
 idempotency. The service handles an identical repeat by returning the existing
@@ -273,9 +361,8 @@ never decide simulation outcomes. The deterministic simulation engine accepts
 immutable typed values and returns new values without importing FastAPI or
 SQLAlchemy.
 
-The OpenAI adapter is intentionally deferred to Phase 8. `mock` is the only
-narrative configuration in the current phase, ensuring offline use remains the
-complete default path. Historical universe forking also remains deferred because
+The OpenAI adapter is optional and `mock` remains the complete offline default.
+Historical universe forking remains deferred because
 the Phase 5 backend does not expose a fork route; the detail screen labels that
 control as unavailable instead of simulating a fork in browser state.
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { DEMO_SCENARIO_ID, DISCLAIMER } from "@/lib/constants";
+import { DISCLAIMER } from "@/lib/constants";
 
 export function AppShell({
   children,
@@ -23,8 +23,8 @@ export function AppShell({
           <span>Multiverse</span>
         </Link>
         <nav aria-label="Primary navigation">
-          <Link href={`/multiverse/${DEMO_SCENARIO_ID}`}>Map</Link>
-          <Link href={`/compare/${DEMO_SCENARIO_ID}`}>Compare</Link>
+          <Link href="/stories">Stories</Link>
+          <Link href="/onboarding">New story</Link>
           <Link href="/settings">Settings</Link>
         </nav>
       </header>

@@ -20,6 +20,7 @@ from app.services.narrative import (
     NarrativeContextBuilder,
     NarrativeProvider,
     NarrativeProviderConfigurationError,
+    OpenAINarrativeProvider,
     UniverseBranchRequest,
     create_narrative_provider,
 )
@@ -108,6 +109,67 @@ async def test_mock_provider_protocol_and_branch_generation_are_reproducible(
 
 
 @pytest.mark.anyio
+async def test_mock_branches_honor_non_demo_directions(session: Session) -> None:
+    context, _, scenario, _, _ = _seeded_context(session)
+    request = UniverseBranchRequest(
+        profile=context.profile.model_copy(update={"occupation": "Financial Analyst"}),
+        decision_question="Should I study, focus on my career, or create content?",
+        scenario_seed=scenario.seed,
+        simulation_mode=SimulationMode.CINEMATIC,
+        branch_directions=[
+            "Stay in University",
+            "Focus on Career as a Financial Analyst",
+            "Become a Content Creator",
+        ],
+    )
+
+    branches = await MockNarrativeProvider().generate_universe_branches(request)
+
+    assert [branch.name for branch in branches] == request.branch_directions
+    assert [branch.proposed_initial_state.career_title for branch in branches] == [
+        "Graduate Student",
+        "Financial Analyst",
+        "Content Creator",
+    ]
+    assert all("AI" not in branch.subtitle for branch in branches)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("flag", "direction", "career", "event_prefix"),
+    [
+        ("education_path", "Stay in University", "Graduate Student", "custom-education-"),
+        (
+            "career_path",
+            "Focus on Career as a Financial Analyst",
+            "Financial Analyst",
+            "custom-career-",
+        ),
+        ("creator_path", "Become a Content Creator", "Content Creator", "custom-creator-"),
+    ],
+)
+async def test_mock_events_use_custom_path_catalogues(
+    session: Session,
+    flag: str,
+    direction: str,
+    career: str,
+    event_prefix: str,
+) -> None:
+    context, _, _, _, _ = _seeded_context(session)
+    payload = context.model_dump(mode="python")
+    payload["universe"]["starting_direction"] = direction
+    payload["current_state"]["career_title"] = career
+    payload["current_state"]["active_flags"] = [flag]
+    custom_context = NarrativeContext.model_validate(payload)
+
+    event = await MockNarrativeProvider().generate_significant_event(custom_context)
+
+    assert event.event_key.startswith(event_prefix)
+    assert "robot" not in f"{event.title} {event.description}".casefold()
+    assert "ai programme" not in event.description.casefold()
+
+
+@pytest.mark.anyio
 async def test_events_are_seeded_reproducible_and_do_not_repeat(session: Session) -> None:
     context, _, _, _, _ = _seeded_context(session)
     provider = MockNarrativeProvider()
@@ -159,10 +221,17 @@ def test_mock_catalogue_supports_required_event_categories() -> None:
     }.issubset(supported)
 
 
-def test_provider_factory_keeps_mock_as_the_only_phase_four_configuration() -> None:
+def test_provider_factory_keeps_mock_default_and_requires_complete_openai_config() -> None:
     assert isinstance(create_narrative_provider(" MOCK "), MockNarrativeProvider)
-    with pytest.raises(NarrativeProviderConfigurationError, match="supports 'mock' only"):
-        create_narrative_provider("openai")
+    assert isinstance(create_narrative_provider("openai"), MockNarrativeProvider)
+    with pytest.raises(NarrativeProviderConfigurationError, match="not fully configured"):
+        create_narrative_provider("openai", fallback_to_mock=False)
+    assert isinstance(
+        create_narrative_provider(
+            "openai", api_key="sk-test-only", model="test-model", fallback_to_mock=False
+        ),
+        OpenAINarrativeProvider,
+    )
 
 
 @pytest.mark.anyio

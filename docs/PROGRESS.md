@@ -2,9 +2,194 @@
 
 ## Current phase
 
-Phase 6 — Complete frontend MVP: **implemented and automated checks complete**
-(2026-08-01). Interactive browser walkthrough remains pending because the
-configured in-app browser reported no available browser session.
+Phase 8 — Optional OpenAI narrative provider: **implemented and automated
+checks complete** (2026-08-03). The mock provider remains the offline default;
+the normal automated suite makes no real OpenAI requests. Profile-free manual
+probes were used only to diagnose the configured model's optional controls.
+
+## OpenAI runtime compatibility follow-up
+
+- Confirmed with profile-free structured-output probes that the configured
+  `gpt-5.6-luna` model and low reasoning work, while its Responses API currently
+  rejects the optional verbosity parameter with HTTP 400
+  `unsupported_parameter`.
+- Disabled verbosity in the active local configuration. The provider now
+  recognizes that safe error code and spends at most one configured retry on a
+  compatibility request with both optional controls omitted instead of falling
+  directly back to deterministic mock output.
+- Added safe HTTP status metadata to provider failure logs without exposing
+  exception messages, response bodies, prompts, profiles, or credentials.
+- Added regression coverage for the compatibility retry, control omission,
+  non-retryable bad requests, retry bounds, and sanitized status logging.
+- Added GPT-only narrative mode through `OPENAI_FALLBACK_TO_MOCK=false`. In this
+  mode, provider failure returns a safe error and rolls back instead of
+  committing deterministic mock prose.
+- Tagged universe generation provenance in `visual_theme` metadata. Untouched
+  mock-authored universe sets are transactionally regenerated through OpenAI
+  when reopened in GPT-only mode; played history remains immutable.
+- Routed legacy pending-event refresh through the configured provider. Strict
+  OpenAI mode also replaces any unselected mock pending decision without
+  altering an existing snapshot or resolved choice.
+- Replaced the engine routine event's visible deterministic title/description
+  with the validated provider yearly summary before commit. Routine effects,
+  financial calculations, caps, and state application remain deterministic.
+- Strengthened the significant-event prompt to demand person- and
+  universe-specific dilemmas, causal continuity, concrete opportunity costs,
+  uncertainty, and non-template choices.
+- Updated Settings provider status to distinguish “GPT only” from “GPT with
+  mock fallback.” Added transaction tests proving unplayed mock stories become
+  provider-authored, yearly decisions are sourced from OpenAI, visible yearly
+  events are provider prose, and replacement failure preserves the old story.
+- Corrected OpenAI strict schemas for dynamic skill, stat, effect, and
+  requirement maps by using bounded unique `{key,value}` entries on the model
+  wire and converting them back into the existing validated engine maps. All
+  six output contracts now avoid unsupported dynamic object properties.
+- Regenerated the latest untouched Hanisa scenario through the live configured
+  provider. All three persisted universes report OpenAI provenance; no event or
+  simulation year was advanced during the regeneration.
+
+## Saved-story navigation follow-up
+
+- Fixed primary navigation always opening the seeded demo scenario after a new
+  person's scenario had been created successfully.
+- Added `/stories`, a local library that groups every persisted scenario under
+  its person and links directly to the correct three-universe map.
+- Added entry points for the library in the application header and landing
+  page, plus actions for another scenario from an existing person or a new
+  person.
+- Added frontend regression coverage proving both old and new profiles remain
+  visible and link to their own scenario IDs. Scenario creation now invalidates
+  the story-list cache.
+- Fixed the underlying non-demo content mismatch: application generation now
+  forwards the scenario form's custom branch directions, and the mock provider
+  derives generic study, career, creator, or independent states instead of
+  reusing Hosein's AI/robotics/startup labels.
+- Opening a saved story now runs the idempotent generation check before routing.
+  Pristine legacy scenarios with the three incorrect demo branches are repaired
+  transactionally; any played history prevents replacement, and failure rolls
+  the attempted repair back to the original universes.
+- Added distinct education, general-career, and content-creator mock event
+  catalogues. The universe screen detects old demo-catalogue pending events for
+  custom paths and refreshes them before displaying a choice; resolved choices
+  and state snapshots are never rewritten.
+- Verified 69 backend tests and all 10 frontend test files/24 tests, Ruff,
+  ESLint, formatting, strict Python and TypeScript checks, and the production
+  build including the new `/stories` route. A browser walkthrough remains
+  unavailable because no browser session was exposed to the workspace.
+
+## Phase 8 completed work
+
+- Added `OpenAINarrativeProvider` using the asynchronous Responses API and
+  Pydantic Structured Outputs for universe branches, significant events, yearly
+  summaries, structured artifacts, future-self profiles, and future-self
+  replies. All six SDK output schemas convert to strict OpenAI JSON schemas.
+- Added separate prompt builders for every task. Prompts treat supplied text as
+  untrusted data, keep requests below 20,000 characters, cap model output, send
+  only bounded context, and retain only eight recent chat messages.
+- Refined prompts for economical GPT-5.6 use: compact outcome-first instructions,
+  task-specific context fields, omission of unused effect/choice data, optional
+  reasoning and verbosity controls, and output ceilings from 800 to 3,000 tokens.
+  The documented starting point is Luna with low reasoning and verbosity
+  unset; Terra is the quality upgrade when evaluation shows the extra prose
+  quality is useful.
+- Added semantic output checks for branch count/uniqueness, event years and
+  duplicate keys, summary years, artifact/event linkage, stable future-self
+  identity fields, and future-self references to stored event keys.
+- Added backend configuration for provider, key, model, timeout, retries, and
+  fallback. Mock remains the default, OpenAI has no hardcoded model, and an
+  incomplete OpenAI configuration safely reports/uses mock fallback when
+  enabled.
+- Disabled SDK retries and added application-owned bounded retry/backoff for
+  timeouts, connections, rate limits, invalid structured output, and empty
+  responses. Authentication failures are not retried. Failure logs contain
+  only safe operation/category/status metadata; API keys are secret-wrapped and
+  hidden from configuration representations.
+- Added mock fallback per narrative operation and provider-status reporting for
+  ready, configured, fallback, and unavailable states. Public config includes
+  no credential field, and the frontend Settings screen displays the safe
+  status and configured model when applicable.
+- Changed important-choice resolution to reconstruct the exact validated event
+  and effects persisted when the choice was shown. OpenAI output is never
+  regenerated for replay; the deterministic engine remains the only state
+  mutation authority.
+- Added failure-injection coverage proving OpenAI timeouts create no events or
+  snapshots and leave universe time unchanged. Existing transaction tests
+  continue to prove summary/artifact failures roll back choice and state
+  changes.
+- Added mocked SDK coverage for successful structured output across all tasks,
+  invalid schemas, oversized and empty output, timeout, authentication failure,
+  rate limiting, retry bounds, fallback, grounded future-self references,
+  secret-free logging, input limits, and bounded chat history.
+- Updated `.env.example`, README privacy/setup guidance, architecture/API docs,
+  and the frontend provider-status presentation. The README now enumerates the
+  exact profile, state, history, and chat fields sent only when OpenAI mode is
+  enabled.
+
+### Phase 8 verification
+
+- `make test` — 57 backend tests and 21 frontend tests passed. API fixtures
+  force mock mode so a developer's local OpenAI configuration cannot trigger a
+  real request during the normal suite.
+- `make lint` — Ruff and ESLint passed.
+- `make format-check` — 66 backend files and all frontend files passed.
+- `make typecheck` — strict MyPy passed across 63 source files and strict
+  TypeScript passed.
+- `make build` with the required Turbopack process permission — backend bytecode
+  compilation and the Next.js production build passed for all nine routes.
+- OpenAI SDK strict-schema conversion — all six narrative output schemas
+  validated locally without a network request.
+
+## Phase 6 onboarding reliability follow-up
+
+- Replaced comma-normalized profile list textareas with explicit Add controls
+  for goals, interests, strengths, growth edges, and constraints. Multi-word
+  phrases now keep their spaces, Enter is an optional shortcut, added items are
+  visible as removable chips, and duplicate entries are ignored.
+- Kept the final profile action clickable whenever it is not actively saving.
+  Validation and API errors are now surfaced after an attempted submission
+  instead of leaving the user with a silently disabled button.
+- Added an interaction-level regression test that enters multi-word profile
+  details, adds them with both the button and Enter, completes onboarding,
+  verifies the create request payload, and verifies scenario navigation.
+- Verified a real profile create request against the running FastAPI service;
+  the response preserved all multi-word list items and returned `201 Created`.
+  The temporary verification profile was deleted immediately afterward.
+
+### Follow-up verification
+
+- `pnpm --dir frontend format:check` — passed.
+- `pnpm --dir frontend lint` — passed.
+- `pnpm --dir frontend typecheck` — strict TypeScript passed.
+- `pnpm --dir frontend test` — 8 files and 20 tests passed.
+- `pnpm --dir frontend build` — Next.js production build passed with all nine
+  application routes.
+
+## Phase 6 scenario-generation reliability follow-up
+
+- Fixed newly generated universes being persisted successfully but rejected by
+  the frontend as an unexpected response. Zod 4's integer schema requires a
+  JavaScript-safe integer, while deterministic universe seeds previously used
+  the wider signed 64-bit database range.
+- Made new universe seeds remain within JavaScript's exact integer range while
+  retaining deterministic derivation and backend ownership of randomness.
+- Kept existing universes compatible without rewriting or migrating their
+  persisted seeds. The frontend treats legacy 64-bit seed values as opaque
+  integer response data because it never performs simulation with them.
+- Added regression coverage for parsing a real legacy-scale seed, rejecting
+  fractional seeds, and ensuring every newly generated seed is browser-safe.
+
+### Scenario-generation follow-up verification
+
+- `cd backend && uv run pytest` — 42 tests passed.
+- `cd backend && uv run ruff check app tests migrations ../scripts` — passed.
+- `cd backend && uv run ruff format --check app tests migrations ../scripts` —
+  63 files already formatted.
+- `cd backend && uv run mypy app tests ../scripts` — strict type checking passed
+  across 60 source files.
+- `cd backend && uv run alembic check` — no schema drift or new upgrade
+  operations detected.
+- `cd backend && uv run python -m compileall -q app migrations ../scripts` —
+  passed.
 
 ## Phase 6 completed work
 
@@ -267,7 +452,9 @@ remain covered by the same backend suite. No schema change was needed in Phase
 
 ## Known limitations
 
-- Only the mock provider is implemented. OpenAI remains deferred to Phase 8.
+- OpenAI availability and model compatibility are configuration-dependent and
+  were not tested against the live service; the normal suite intentionally uses
+  mocked SDK responses only.
 - Historical universe forking remains unavailable because there is no Phase 5
   fork API. The frontend leaves the control disabled rather than inventing
   client-only history.
@@ -281,6 +468,6 @@ remain covered by the same backend suite. No schema change was needed in Phase
 
 ## Next task
 
-Phase 7 functionality requested alongside Phase 6 (comparison, artifact viewer,
-and future-self interface) is already present. The next numbered phase is Phase
-8 — OpenAI provider, only when explicitly requested.
+Phase 9 — Quality pass: accessibility, responsive-layout review, an available
+interactive browser walkthrough, end-to-end coverage, and final documentation
+review.

@@ -18,6 +18,10 @@ from app.services.narrative.schemas import (
 class NarrativeProvider(Protocol):
     """Read-only narrative port; implementations receive values and return proposals."""
 
+    provider_name: str
+    last_used_provider: str
+    llm_only: bool
+
     async def generate_universe_branches(
         self, request: UniverseBranchRequest
     ) -> tuple[GeneratedUniverseBranch, ...]: ...

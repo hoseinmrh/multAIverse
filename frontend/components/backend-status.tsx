@@ -12,7 +12,7 @@ export function BackendStatus() {
 
   const label = {
     checking: "Checking local backend…",
-    online: `${config.data?.narrative_provider === "mock" ? "Offline narrative" : "Backend"} ready`,
+    online: `${config.data?.narrative_provider_status.active_provider === "mock" ? "Offline narrative" : "Backend"} ready`,
     offline: "Local backend unavailable",
   }[connectionState];
 

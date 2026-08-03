@@ -3,7 +3,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ErrorState, LoadingState } from "@/components/ui/async-state";
 import {
@@ -38,14 +38,49 @@ export function UniverseDetail({
   const [openedArtifact, setOpenedArtifact] = useState<Artifact | null>(null);
   const [decision, setDecision] = useState<EventDetail | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const repairAttempted = useRef(false);
 
-  const pendingEventId = eventsQuery.data?.items.find(
+  const pendingEvent = eventsQuery.data?.items.find(
     (event) => event.status === "pending",
-  )?.id;
+  );
+  const pendingEventId = pendingEvent?.id;
+  const customPathFlags = new Set([
+    "career_path",
+    "education_path",
+    "creator_path",
+    "independent_path",
+  ]);
+  const isLegacyCustomEvent = Boolean(
+    pendingEvent?.narrative_key &&
+    ["industry-", "research-", "startup-"].some((prefix) =>
+      pendingEvent.narrative_key?.startsWith(prefix),
+    ) &&
+    stateQuery.data?.state.active_flags.some((flag) =>
+      customPathFlags.has(flag),
+    ),
+  );
+  const prepareScenario = useMutation({
+    mutationFn: () => api.generateUniverses(scenarioId),
+    onSuccess: async () => {
+      setDecision(null);
+      await refresh();
+      setNotice("This decision was refreshed for the current story.");
+    },
+  });
+  const prepareScenarioMutation = prepareScenario.mutate;
+
+  useEffect(() => {
+    if (!isLegacyCustomEvent || !scenarioId || repairAttempted.current) return;
+    repairAttempted.current = true;
+    prepareScenarioMutation();
+  }, [isLegacyCustomEvent, prepareScenarioMutation, scenarioId]);
+
   const pendingDecision = useQuery({
     queryKey: ["event", pendingEventId],
     queryFn: () => api.event(pendingEventId ?? ""),
-    enabled: Boolean(pendingEventId),
+    enabled:
+      Boolean(pendingEventId) &&
+      (!isLegacyCustomEvent || prepareScenario.isError),
   });
 
   const advance = useMutation({
@@ -136,8 +171,12 @@ export function UniverseDetail({
 
   const { universe, state } = stateQuery.data;
   const accent = universeAccent(universe.visual_theme);
-  const activeDecision = decision ?? pendingDecision.data ?? null;
-  const mutationError = advance.error ?? selectChoice.error ?? reset.error;
+  const activeDecision =
+    isLegacyCustomEvent && !prepareScenario.isError
+      ? null
+      : (decision ?? pendingDecision.data ?? null);
+  const mutationError =
+    advance.error ?? selectChoice.error ?? reset.error ?? prepareScenario.error;
   const statValues = [
     ["Happiness", state.happiness, false],
     ["Health", state.health, false],

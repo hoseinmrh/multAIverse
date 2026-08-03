@@ -88,7 +88,9 @@ export function SettingsScreen() {
           </div>
           <ProviderStatus config={config.data} />
           <p className="settings-note">
-            OpenAI mode is intentionally not implemented in this phase.
+            Credentials remain backend-only and are never returned to this
+            screen. When enabled, OpenAI receives only the bounded profile and
+            stored-timeline context documented in the project README.
           </p>
         </section>
 

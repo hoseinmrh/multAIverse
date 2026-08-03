@@ -3,8 +3,9 @@ from uuid import UUID
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
+from app.models import Event, Universe
 from app.services.demo_seed import DEMO_PROFILE_ID, DEMO_SCENARIO_ID, DemoSeedService
 
 
@@ -158,6 +159,13 @@ async def test_public_config_and_profile_crud_use_explicit_safe_responses(
         assert "api_key" not in serialized
         assert "openai_api_key" not in serialized
         assert config.json()["narrative_provider"] == "mock"
+        assert config.json()["narrative_provider_status"] == {
+            "active_provider": "mock",
+            "state": "ready",
+            "model": None,
+            "fallback_enabled": False,
+            "detail": "Offline deterministic narrative generation is ready.",
+        }
 
         created = await client.post("/api/v1/profiles", json=profile_payload)
         assert created.status_code == 201
@@ -186,7 +194,9 @@ async def test_public_config_and_profile_crud_use_explicit_safe_responses(
 
 
 @pytest.mark.anyio
-async def test_new_scenario_generates_three_persisted_universes(api_app: FastAPI) -> None:
+async def test_new_scenario_generates_three_persisted_universes(
+    api_app: FastAPI, session_factory: sessionmaker[Session]
+) -> None:
     async with AsyncClient(
         transport=ASGITransport(app=api_app), base_url="http://testserver"
     ) as client:
@@ -208,7 +218,11 @@ async def test_new_scenario_generates_three_persisted_universes(api_app: FastAPI
                 "profile_id": profile.json()["id"],
                 "title": "After graduation",
                 "decision_question": "What should Mina prioritize?",
-                "description": "Three fictional alternatives.",
+                "description": (
+                    "Three fictional alternatives.\n\n"
+                    "Optional branch directions: Continue studying | Build an analyst career | "
+                    "Become a content creator."
+                ),
                 "number_of_universes": 3,
                 "simulation_mode": "cinematic",
                 "seed": 12345,
@@ -223,8 +237,61 @@ async def test_new_scenario_generates_three_persisted_universes(api_app: FastAPI
         assert generated.json()["generated"] is True
         universes = generated.json()["universes"]
         assert len(universes) == 3
+        expected_directions = {
+            "Continue studying",
+            "Build an analyst career",
+            "Become a content creator",
+        }
+        assert {item["name"] for item in universes} == expected_directions
+        assert {item["starting_direction"] for item in universes} == expected_directions
         assert len({item["random_seed"] for item in universes}) == 3
+        assert all(0 <= item["random_seed"] <= 2**53 - 1 for item in universes)
+
+        legacy_directions = (
+            ("Applied AI Leader", "applied-ai-leader"),
+            ("Robotics Researcher", "robotics-researcher"),
+            ("Startup Founder", "startup-founder"),
+        )
+        with session_factory() as database_session, database_session.begin():
+            for item, (name, slug) in zip(universes, legacy_directions, strict=True):
+                universe = database_session.get(Universe, UUID(item["id"]))
+                assert universe is not None
+                universe.name = name
+                universe.slug = slug
+                universe.starting_direction = name
+
+        repaired = await client.post(
+            f"/api/v1/scenarios/{scenario.json()['id']}/generate-universes"
+        )
+        assert repaired.status_code == 201
+        assert repaired.json()["generated"] is True
+        universes = repaired.json()["universes"]
+        assert {item["name"] for item in universes} == expected_directions
+
         for universe in universes:
             state = await client.get(f"/api/v1/universes/{universe['id']}/state")
             assert state.status_code == 200
             assert state.json()["state"]["year"] == 2026
+
+        creator = next(
+            item for item in universes if item["starting_direction"] == "Become a content creator"
+        )
+        advanced = await client.post(f"/api/v1/universes/{creator['id']}/advance")
+        legacy_event_id = advanced.json()["event"]["event"]["id"]
+        with session_factory() as database_session, database_session.begin():
+            event = database_session.get(Event, UUID(legacy_event_id))
+            assert event is not None
+            event.narrative_key = "startup-founder-role"
+            event.title = "The company outgrows one founder's job"
+            event.description = "An old demo event."
+
+        prepared = await client.post(
+            f"/api/v1/scenarios/{scenario.json()['id']}/generate-universes"
+        )
+        assert prepared.status_code == 201
+        assert prepared.json()["generated"] is False
+        events = await client.get(f"/api/v1/universes/{creator['id']}/events")
+        replacement = events.json()["items"][0]
+        assert replacement["id"] != legacy_event_id
+        assert replacement["narrative_key"].startswith("custom-creator-")
+        assert "founder" not in replacement["title"].casefold()

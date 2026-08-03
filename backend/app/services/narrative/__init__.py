@@ -1,9 +1,23 @@
 from app.services.narrative.context import NarrativeContextBuilder
 from app.services.narrative.factory import (
     NarrativeProviderConfigurationError,
+    NarrativeProviderStatus,
     create_narrative_provider,
+    get_narrative_provider_status,
 )
 from app.services.narrative.mock import MockNarrativeProvider
+from app.services.narrative.openai import (
+    NarrativeProviderAuthenticationError,
+    NarrativeProviderEmptyResponseError,
+    NarrativeProviderError,
+    NarrativeProviderInputLimitError,
+    NarrativeProviderInvalidOutputError,
+    NarrativeProviderRateLimitError,
+    NarrativeProviderRequestError,
+    NarrativeProviderTimeoutError,
+    OpenAINarrativeConfiguration,
+    OpenAINarrativeProvider,
+)
 from app.services.narrative.provider import NarrativeProvider
 from app.services.narrative.schemas import (
     FutureSelfMessage,
@@ -31,11 +45,23 @@ __all__ = [
     "GeneratedUniverseBranch",
     "GeneratedYearSummary",
     "MockNarrativeProvider",
+    "NarrativeProviderAuthenticationError",
     "NarrativeContext",
     "NarrativeContextBuilder",
     "NarrativeProvider",
     "NarrativeProviderConfigurationError",
+    "NarrativeProviderEmptyResponseError",
+    "NarrativeProviderError",
+    "NarrativeProviderInvalidOutputError",
+    "NarrativeProviderInputLimitError",
+    "NarrativeProviderRateLimitError",
+    "NarrativeProviderRequestError",
+    "NarrativeProviderStatus",
+    "NarrativeProviderTimeoutError",
+    "OpenAINarrativeConfiguration",
+    "OpenAINarrativeProvider",
     "ProfileNarrativeSummary",
     "UniverseBranchRequest",
     "create_narrative_provider",
+    "get_narrative_provider_status",
 ]

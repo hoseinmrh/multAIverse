@@ -43,10 +43,19 @@ class Page[ItemT](ApiSchema):
     pagination: Pagination
 
 
+class NarrativeProviderStatusResponse(ApiSchema):
+    active_provider: Literal["mock", "openai"] | None
+    state: Literal["ready", "configured", "fallback", "unavailable"]
+    model: str | None
+    fallback_enabled: bool
+    detail: str
+
+
 class PublicConfigResponse(ApiSchema):
     app_name: str
     app_version: str
-    narrative_provider: Literal["mock"]
+    narrative_provider: Literal["mock", "openai"]
+    narrative_provider_status: NarrativeProviderStatusResponse
     simulation_modes: list[SimulationMode]
     max_universe_branches: int
     fictional_simulation_disclaimer: str

@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.core.config import get_settings
 from app.db.base import Base
 from app.db.session import build_engine, get_session
 from app.main import create_app
@@ -36,7 +37,11 @@ def session(session_factory: sessionmaker[Session]) -> Generator[Session, None, 
 
 
 @pytest.fixture
-def api_app(session_factory: sessionmaker[Session]) -> FastAPI:
+def api_app(
+    session_factory: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> Generator[FastAPI, None, None]:
+    monkeypatch.setenv("NARRATIVE_PROVIDER", "mock")
+    get_settings.cache_clear()
     application = create_app()
 
     def override_session() -> Generator[Session, None, None]:
@@ -44,4 +49,5 @@ def api_app(session_factory: sessionmaker[Session]) -> FastAPI:
             yield database_session
 
     application.dependency_overrides[get_session] = override_session
-    return application
+    yield application
+    get_settings.cache_clear()

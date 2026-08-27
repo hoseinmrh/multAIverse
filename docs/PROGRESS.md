@@ -8,22 +8,11 @@ the mock provider remains the offline default, and automated checks make no real
 OpenAI requests. Playwright coverage and a full interactive
 accessibility/responsive walkthrough remain outstanding.
 
-## Repository-readiness follow-up
+## Clean-clone setup follow-up
 
-- Added GitHub Actions CI with separate backend and frontend jobs. It installs
-  locked dependencies, runs tests, lint and formatting checks, performs strict
-  type checking, verifies Alembic migration drift, compiles the backend, and
-  builds the production frontend.
-- Added weekly Dependabot checks for pnpm, uv, and GitHub Actions dependencies.
-- Added structured bug and feature issue forms, a private security-reporting
-  link, and a pull-request checklist aligned with the domain invariants.
-- Added `CONTRIBUTING.md` and `SECURITY.md` with clean-clone setup, verification,
-  architecture boundaries, sensitive-data rules, and vulnerability reporting.
-- Added `docs/GITHUB_SETUP.md` for the owner-only post-push description, ruleset,
-  status-check, Dependabot, private-reporting, license, and release settings.
 - Reworked the README around a clone-to-demo quick start, explicit network and
-  platform expectations, seeded database behavior, CI, project status, and
-  honest Phase 9 limitations.
+  platform expectations, seeded database behavior, project status, and honest
+  Phase 9 limitations.
 - Split backend-only root configuration from the browser-safe
   `frontend/.env.local` template, matching how Next.js actually loads
   environment files, and made both dev server hosts and ports configurable
@@ -53,8 +42,7 @@ accessibility/responsive walkthrough remain outstanding.
   `8f4d3b2a1c0e (head)` and no schema drift.
 - `make simulation-demo` — all three universes reached 2031 with six immutable
   snapshots each.
-- GitHub workflow, Dependabot, and issue-form YAML parsed successfully; all new
-  Markdown and YAML passed Prettier, and `git diff --check` passed.
+- Updated Markdown passed Prettier, and `git diff --check` passed.
 
 ## OpenAI runtime compatibility follow-up
 

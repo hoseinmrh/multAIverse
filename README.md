@@ -1,7 +1,5 @@
 # Multiverse
 
-[![CI](https://github.com/hoseinmrh/multAIverse/actions/workflows/ci.yml/badge.svg)](https://github.com/hoseinmrh/multAIverse/actions/workflows/ci.yml)
-
 Multiverse is a local-first fictional alternate-life simulation game. Create a
 profile, branch one major decision into three possible futures, advance their
 timelines, resolve trade-offs, compare outcomes, inspect fictional artifacts,
@@ -127,11 +125,6 @@ make build
 Alembic migrations and idempotently creates the demo profile, scenario, three
 universes, and their initial snapshots. `make reset-db` destructively rebuilds
 the local database and restores that seed.
-
-GitHub Actions runs the same backend and frontend tests, linting, formatting,
-strict type checks, migration drift check, and production build on pushes to
-`main` and on pull requests. Dependabot checks the pnpm, uv, and GitHub Actions
-dependencies weekly.
 
 Backend-only Phase 5 verification can be run from `backend/` with
 `uv run pytest`, `uv run ruff check app tests migrations ../scripts`, and
@@ -280,10 +273,7 @@ make dev BACKEND_PORT=8001 FRONTEND_PORT=3001
   existing local simulation data before restoring the demo seed.
 
 See [the architecture overview](docs/ARCHITECTURE.md),
-[implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and
-[contribution guide](CONTRIBUTING.md). Repository owners should also complete
-the post-push [GitHub settings checklist](docs/GITHUB_SETUP.md). Report suspected
-vulnerabilities through the private process in [SECURITY.md](SECURITY.md).
+[implementation plan](docs/PLAN.md), and [progress log](docs/PROGRESS.md).
 
 ## Project status
 

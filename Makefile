@@ -1,5 +1,9 @@
 SHELL := /bin/bash
 export UV_CACHE_DIR := $(CURDIR)/backend/.uv-cache
+BACKEND_HOST ?= 127.0.0.1
+BACKEND_PORT ?= 8000
+FRONTEND_HOST ?= 127.0.0.1
+FRONTEND_PORT ?= 3000
 
 .PHONY: setup dev backend-dev frontend-dev test lint format format-check typecheck build seed reset-db simulation-demo mock-narrative-demo
 
@@ -8,13 +12,13 @@ setup:
 	CI=true pnpm install --frozen-lockfile
 
 dev:
-	bash scripts/dev.sh
+	BACKEND_HOST="$(BACKEND_HOST)" BACKEND_PORT="$(BACKEND_PORT)" FRONTEND_HOST="$(FRONTEND_HOST)" FRONTEND_PORT="$(FRONTEND_PORT)" bash scripts/dev.sh
 
 backend-dev:
-	cd backend && uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+	cd backend && uv run uvicorn app.main:app --reload --host "$(BACKEND_HOST)" --port "$(BACKEND_PORT)"
 
 frontend-dev:
-	pnpm --dir frontend dev
+	pnpm --dir frontend exec next dev --hostname "$(FRONTEND_HOST)" --port "$(FRONTEND_PORT)"
 
 test:
 	cd backend && uv run pytest

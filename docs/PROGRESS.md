@@ -2,10 +2,59 @@
 
 ## Current phase
 
-Phase 8 — Optional OpenAI narrative provider: **implemented and automated
-checks complete** (2026-08-03). The mock provider remains the offline default;
-the normal automated suite makes no real OpenAI requests. Profile-free manual
-probes were used only to diagnose the configured model's optional controls.
+Phase 9 — Quality pass: **in progress** (repository-readiness pass completed
+2026-08-27). The core application and Phase 8 OpenAI provider are implemented;
+the mock provider remains the offline default, and automated checks make no real
+OpenAI requests. Playwright coverage and a full interactive
+accessibility/responsive walkthrough remain outstanding.
+
+## Repository-readiness follow-up
+
+- Added GitHub Actions CI with separate backend and frontend jobs. It installs
+  locked dependencies, runs tests, lint and formatting checks, performs strict
+  type checking, verifies Alembic migration drift, compiles the backend, and
+  builds the production frontend.
+- Added weekly Dependabot checks for pnpm, uv, and GitHub Actions dependencies.
+- Added structured bug and feature issue forms, a private security-reporting
+  link, and a pull-request checklist aligned with the domain invariants.
+- Added `CONTRIBUTING.md` and `SECURITY.md` with clean-clone setup, verification,
+  architecture boundaries, sensitive-data rules, and vulnerability reporting.
+- Added `docs/GITHUB_SETUP.md` for the owner-only post-push description, ruleset,
+  status-check, Dependabot, private-reporting, license, and release settings.
+- Reworked the README around a clone-to-demo quick start, explicit network and
+  platform expectations, seeded database behavior, CI, project status, and
+  honest Phase 9 limitations.
+- Split backend-only root configuration from the browser-safe
+  `frontend/.env.local` template, matching how Next.js actually loads
+  environment files, and made both dev server hosts and ports configurable
+  through Make parameters.
+- Rechecked the public OpenAI model guidance against current official
+  documentation and removed a brittle model-specific verbosity claim from the
+  setup path; optional controls now default to unset and remain evaluation-led.
+- Expanded generated-file ignores and removed the obsolete root `test.md`
+  implementation-prompt scratchpad; its history remains recoverable through
+  Git.
+
+### Repository-readiness verification
+
+- Isolated clean-copy `make setup` — installed all locked backend and frontend
+  dependencies successfully.
+- Isolated clean-copy `make seed` — upgraded from an empty SQLite database to
+  Alembic head and seeded the three-universe demo.
+- Isolated clean-copy `make dev` — backend and frontend started; `/api/v1/health`
+  returned HTTP 200 and the landing page rendered successfully.
+- `make test` — 69 backend tests and 24 frontend tests passed.
+- `make lint` — Ruff and ESLint passed.
+- `make format-check` — all backend and frontend files passed.
+- `make typecheck` — strict MyPy checks passed across 63 source files and
+  TypeScript reported no errors.
+- `make build` — backend compilation and the Next.js production build passed.
+- `uv run alembic current` / `uv run alembic check` — revision
+  `8f4d3b2a1c0e (head)` and no schema drift.
+- `make simulation-demo` — all three universes reached 2031 with six immutable
+  snapshots each.
+- GitHub workflow, Dependabot, and issue-form YAML parsed successfully; all new
+  Markdown and YAML passed Prettier, and `git diff --check` passed.
 
 ## OpenAI runtime compatibility follow-up
 

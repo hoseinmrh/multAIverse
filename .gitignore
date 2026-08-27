@@ -18,6 +18,7 @@ backend/.coverage
 
 # JavaScript
 node_modules/
+.pnpm-store/
 .next/
 coverage/
 frontend/.next/

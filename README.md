@@ -1,45 +1,80 @@
 # Multiverse
 
-Multiverse is a local-first fictional alternate-life simulator. The project has
-completed the core frontend and optional OpenAI narrative-provider phases. The
-polished Next.js application now
-drives the FastAPI APIs for profile onboarding, scenario generation, a React
-Flow multiverse map, yearly decisions, immutable timelines, statistics,
-artifacts, comparison charts, future-self chat, a saved-story library, settings,
-and demo reset. The
-offline mock narrative provider remains the default and powers the entire
-experience without an API key. An optional backend-only OpenAI Responses API
-adapter adds schema-constrained narrative generation when explicitly enabled.
+[![CI](https://github.com/hoseinmrh/multAIverse/actions/workflows/ci.yml/badge.svg)](https://github.com/hoseinmrh/multAIverse/actions/workflows/ci.yml)
+
+Multiverse is a local-first fictional alternate-life simulation game. Create a
+profile, branch one major decision into three possible futures, advance their
+timelines, resolve trade-offs, compare outcomes, inspect fictional artifacts,
+and talk to a generated future self.
+
+The Next.js frontend uses the versioned FastAPI API; SQLite stores local data,
+and a deterministic engine owns every state change. The offline mock narrative
+provider is the default and supports the complete experience without an API
+key. An optional backend-only OpenAI Responses API provider adds
+schema-constrained narrative generation when explicitly configured.
 
 > Multiverse creates fictional scenarios for entertainment and reflection. Its
 > simulations are not predictions or professional advice.
 
 ## Prerequisites
 
-- Node.js 20.9 or newer (the repository pins 24.10.0 for local development)
+- Git
+- Node.js 20.9 or newer (the repository and CI pin 24.10.0)
 - pnpm 10.33.0
-- `uv`
-- GNU Make
+- `uv` with access to Python 3.12+
+- Bash and GNU Make
 
-On macOS, install the missing Python tooling with:
+On macOS, one installation option is:
 
 ```bash
-brew install uv
+brew install node uv
+npm install --global pnpm@10.33.0
 uv python install 3.12
 ```
 
-`uv` uses `.python-version` and manages the virtual environment automatically.
+On Linux or Windows, install [Node.js](https://nodejs.org/en/download) and
+[pnpm](https://pnpm.io/installation) through their official installers and
+install `uv` using its
+[platform instructions](https://docs.astral.sh/uv/getting-started/installation/).
+Windows contributors should use WSL because the shared development commands are
+Bash/Make based. `uv` reads `.python-version` and manages the backend virtual
+environment automatically.
 
-## Setup
+## Quick start
+
+Clone the repository and enter it:
+
+```bash
+git clone https://github.com/hoseinmrh/multAIverse.git
+cd multAIverse
+```
+
+Create local configuration, install the locked dependencies, and seed the demo:
 
 ```bash
 cp .env.example .env
+cp frontend/.env.example frontend/.env.local
 make setup
 make seed
 ```
 
-No API key or network connection is needed. The offline mock provider powers
-the complete backend flow.
+First-time dependency and tool installation needs network access. After those
+dependencies are installed, the default mock experience needs no API key or
+external narrative service.
+
+Start both applications:
+
+```bash
+make dev
+```
+
+Open <http://localhost:3000>. The API health endpoint is
+<http://127.0.0.1:8000/api/v1/health>, and interactive API documentation is at
+<http://127.0.0.1:8000/docs>. Stop both processes with `Ctrl+C`.
+
+The seed command applies all Alembic migrations, creates
+`backend/data/multiverse.db`, and idempotently adds the demo profile, scenario,
+three universes, and initial snapshots. Re-running `make seed` is safe.
 
 To run all three seeded universes through five deterministic years in an
 ephemeral database, without an LLM or narrative provider:
@@ -51,17 +86,7 @@ make simulation-demo
 The command prints the final 2031 statistics and leaves the normal local
 database unchanged.
 
-## Run locally
-
-Start both applications:
-
-```bash
-make dev
-```
-
-Then open <http://localhost:3000>. The API health endpoint is available at
-<http://127.0.0.1:8000/api/v1/health>, and interactive API documentation is at
-<http://127.0.0.1:8000/docs>.
+## Explore the demo
 
 From the landing page, choose **Explore Hosein's demo** to open the seeded three-
 branch map. Open any universe, advance a year, resolve its decision, inspect the
@@ -103,6 +128,11 @@ Alembic migrations and idempotently creates the demo profile, scenario, three
 universes, and their initial snapshots. `make reset-db` destructively rebuilds
 the local database and restores that seed.
 
+GitHub Actions runs the same backend and frontend tests, linting, formatting,
+strict type checks, migration drift check, and production build on pushes to
+`main` and on pull requests. Dependabot checks the pnpm, uv, and GitHub Actions
+dependencies weekly.
+
 Backend-only Phase 5 verification can be run from `backend/` with
 `uv run pytest`, `uv run ruff check app tests migrations ../scripts`, and
 `uv run mypy app tests ../scripts`.
@@ -128,8 +158,9 @@ uv run alembic check
 ## Configuration
 
 Backend settings are read from environment variables or the root `.env` file.
-Only variables beginning with `NEXT_PUBLIC_` are available to browser code.
-Never add secrets to those variables.
+The frontend reads its browser-safe configuration from `frontend/.env.local`.
+Only variables beginning with `NEXT_PUBLIC_` are available to browser code;
+never add credentials or other secrets to the frontend environment file.
 
 `GET /api/v1/config/public` exposes only safe UI configuration and provider
 readiness; it never returns database settings or credentials. Profile data
@@ -150,25 +181,25 @@ OPENAI_FALLBACK_TO_MOCK=true
 
 To enable OpenAI generation, set `NARRATIVE_PROVIDER=openai`, provide a
 backend-only `OPENAI_API_KEY`, and set `OPENAI_MODEL` to a Responses API model
-that supports Structured Outputs. For current GPT-5.6 models,
-`gpt-5.6-luna` is the lowest-cost recommendation for these tightly structured
-tasks; use `gpt-5.6-terra` when richer prose is worth the additional cost. Avoid
-the bare `gpt-5.6` alias for routine generation because it selects the frontier
-Sol tier. There is deliberately no hardcoded model default.
+that supports Structured Outputs. OpenAI's current
+[model guidance](https://developers.openai.com/api/docs/guides/latest-model)
+positions `gpt-5.6-luna` for efficient high-volume work and `gpt-5.6-terra` for
+a balance of intelligence and cost; evaluate both on representative narrative
+tasks. The bare `gpt-5.6` alias routes to the frontier Sol tier. There is
+deliberately no hardcoded model default.
 
-For GPT-5 models, `OPENAI_REASONING_EFFORT=low` is the economical starting
-point. Leave `OPENAI_VERBOSITY` unset for `gpt-5.6-luna`; its Responses API
-currently rejects that optional control. Omit either variable for any model
-that does not support it, and increase reasoning to `medium` only after a local
-quality comparison demonstrates a benefit. If OpenAI reports an optional
-control as unsupported, the adapter retries once within the configured retry
-budget with both optional controls omitted. Requests use the Responses API
-with Pydantic Structured Outputs, `store=false`, a bounded timeout, task-specific
-800-3,000 token output ceilings, and at most `OPENAI_MAX_RETRIES + 1` total
-attempts. Authentication errors are not retried. When fallback is enabled,
-provider failures use the deterministic mock implementation; incomplete OpenAI
-configuration also activates the mock fallback. The Settings screen reports
-configured, fallback, or unavailable state without exposing a credential.
+Leave `OPENAI_REASONING_EFFORT` and `OPENAI_VERBOSITY` unset initially to use
+the selected model's defaults. Add supported controls only after comparing
+quality, latency, and cost on this application's structured tasks. If OpenAI
+reports an optional control as unsupported, the adapter retries once within the
+configured retry budget with both optional controls omitted. Requests use the
+Responses API with Pydantic Structured Outputs, `store=false`, a bounded
+timeout, task-specific 800-3,000 token output ceilings, and at most
+`OPENAI_MAX_RETRIES + 1` total attempts. Authentication errors are not retried.
+When fallback is enabled, provider failures use the deterministic mock
+implementation; incomplete OpenAI configuration also activates the mock
+fallback. The Settings screen reports configured, fallback, or unavailable
+state without exposing a credential.
 
 Set `OPENAI_FALLBACK_TO_MOCK=false` for GPT-only narrative mode. In that mode,
 universe branches and initial states, yearly decision scenarios and choices,
@@ -214,9 +245,13 @@ the deterministic engine before persistence. Provider failures occur inside
 application transaction boundaries, so unfinished simulation changes are
 rolled back.
 
-If the ports change, update both `BACKEND_PORT` and
-`NEXT_PUBLIC_API_BASE_URL`. Add the frontend origin to
-`BACKEND_CORS_ORIGINS` when changing its port or hostname.
+To use different local ports, update `NEXT_PUBLIC_API_BASE_URL` in
+`frontend/.env.local` and `BACKEND_CORS_ORIGINS` in the root `.env`, then launch
+with matching Make parameters. For example:
+
+```bash
+make dev BACKEND_PORT=8001 FRONTEND_PORT=3001
+```
 
 ## Troubleshooting
 
@@ -231,6 +266,10 @@ If the ports change, update both `BACKEND_PORT` and
   application separately with an alternate port and matching environment values.
 - **Dependency state is stale:** remove only the generated `.venv`,
   `node_modules`, and `.next` directories, then run `make setup` again.
+- **`pnpm` is missing or has the wrong version:** run
+  `npm install --global pnpm@10.33.0`, then confirm with `pnpm --version`.
+- **Make commands fail on Windows:** run the project inside WSL; native Windows
+  shells are not currently supported by the shared Bash scripts.
 - **The database schema is missing:** run `make seed` to migrate and populate it.
 - **OpenAI status shows fallback:** set both backend-only `OPENAI_API_KEY` and
   `OPENAI_MODEL`, or return to `NARRATIVE_PROVIDER=mock`. Check that the chosen
@@ -241,4 +280,17 @@ If the ports change, update both `BACKEND_PORT` and
   existing local simulation data before restoring the demo seed.
 
 See [the architecture overview](docs/ARCHITECTURE.md),
-[implementation plan](docs/PLAN.md), and [progress log](docs/PROGRESS.md).
+[implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and
+[contribution guide](CONTRIBUTING.md). Repository owners should also complete
+the post-push [GitHub settings checklist](docs/GITHUB_SETUP.md). Report suspected
+vulnerabilities through the private process in [SECURITY.md](SECURITY.md).
+
+## Project status
+
+The core mock and optional OpenAI flows, backend API, frontend screens, and
+automated unit/integration checks are implemented. Phase 9 remains in progress:
+the repository does not yet contain the product spec's Playwright browser happy
+path, historical universe forking remains unavailable, and a full interactive
+accessibility/responsive walkthrough is still pending. See
+[`docs/PROGRESS.md`](docs/PROGRESS.md) for the exact verification history and
+known limitations.
